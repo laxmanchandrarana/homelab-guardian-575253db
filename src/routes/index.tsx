@@ -479,8 +479,19 @@ function GuardianInsights() {
 }
 
 function EventFeed() {
-  const [events, setEvents] = useState(liveEvents);
+  const { events: liveData, isLive } = useNotifications();
+  const [events, setEvents] = useState<{ time: string; text: string; status: Status }[]>(
+    isLive ? liveData : fallbackEvents
+  );
+
+  // Mirror live data into local state when it changes
   useEffect(() => {
+    if (isLive) setEvents(liveData);
+  }, [liveData, isLive]);
+
+  // In demo mode, simulate streaming
+  useEffect(() => {
+    if (API_CONFIGURED) return;
     const pool = [
       { text: "Prometheus scrape ok", status: "healthy" as Status },
       { text: "CPU normalized on n8n", status: "healthy" as Status },
@@ -505,9 +516,12 @@ function EventFeed() {
             <span className="status-dot-pulse" />
             <span className="ping-dot" />
           </span>
-          Streaming
+          {isLive ? "Streaming" : "Demo"}
         </span>
       </div>
+      {events.length === 0 ? (
+        <div className="rounded-md border border-border bg-background/40 px-3 py-8 text-center text-xs text-muted-foreground">No events yet.</div>
+      ) : (
       <ol className="relative ml-2 flex-1 space-y-3 overflow-y-auto pr-1">
         {events.map((e, i) => (
           <motion.li
@@ -523,6 +537,8 @@ function EventFeed() {
           </motion.li>
         ))}
       </ol>
+      )}
     </aside>
   );
 }
+
