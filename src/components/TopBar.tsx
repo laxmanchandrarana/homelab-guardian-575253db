@@ -1,12 +1,18 @@
 import { Bell, Moon, Search, Settings, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useGuardianSocket } from "@/hooks/useGuardianSocket";
+import { API_CONFIGURED } from "@/lib/api";
 
 export function TopBar() {
-  const [time, setTime] = useState(() => new Date());
+  // Initialize as null to avoid SSR/CSR hydration mismatch on the clock.
+  const [time, setTime] = useState<Date | null>(null);
   useEffect(() => {
+    setTime(new Date());
     const id = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+  const { status } = useGuardianSocket();
+  const connected = status === "open";
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md md:px-6">
