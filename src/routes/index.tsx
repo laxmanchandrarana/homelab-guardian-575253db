@@ -72,6 +72,11 @@ function Dashboard() {
             <EventFeed />
           </div>
         </div>
+        {!API_CONFIGURED && (
+          <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-xs text-warning">
+            Demo mode — set <code className="rounded bg-background/50 px-1">VITE_API_URL</code> (e.g. <code className="rounded bg-background/50 px-1">http://100.93.15.3:8008</code>) to connect Guardian's FastAPI backend.
+          </div>
+        )}
       </div>
     </AppShell>
   );
