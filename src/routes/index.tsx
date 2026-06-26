@@ -1,22 +1,23 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
-  ShieldCheck, Boxes, AlertTriangle, Sparkles, Cpu, MemoryStick,
-  HardDrive, Wifi, Brain, RotateCw, FileText, BarChart3, ChevronRight,
+  Cpu, Brain, RotateCw, FileText, BarChart3, ChevronRight,
+  ShieldCheck, Activity, Lightbulb, Clock, CheckCircle2, AlertTriangle, ArrowRight,
 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { Sparkline } from "@/components/Sparkline";
-import { topMetrics, services, liveEvents, infraNodes, genSeries, type Status } from "@/lib/mock-data";
+import { HealthRing } from "@/components/HealthRing";
+import { topMetrics, services, liveEvents, infraNodes, incidentTimeline, guardianInsights, genSeries, type Status } from "@/lib/mock-data";
 import * as Icons from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Dashboard — Homelab Guardian" },
-      { name: "description", content: "Real-time health overview of your homelab infrastructure." },
+      { name: "description", content: "Real-time AI operations center for your homelab infrastructure." },
     ],
   }),
   component: Dashboard,
@@ -26,6 +27,23 @@ const statusColor: Record<Status, string> = {
   healthy: "text-success",
   warning: "text-warning",
   danger: "text-destructive",
+};
+const statusBg: Record<Status, string> = {
+  healthy: "bg-success",
+  warning: "bg-warning",
+  danger: "bg-destructive",
+};
+const accentGlow: Record<string, string> = {
+  success: "glow-success",
+  warning: "glow-warning",
+  danger: "glow-danger",
+  primary: "glow-primary",
+};
+const accentText: Record<string, string> = {
+  success: "text-success",
+  warning: "text-warning",
+  danger: "text-destructive",
+  primary: "text-primary",
 };
 
 const ranges = ["15m", "1h", "6h", "24h"] as const;
@@ -37,15 +55,19 @@ function Dashboard() {
     <AppShell>
       <div className="mx-auto flex max-w-[1600px] flex-col gap-6">
         <PageHeader />
-        <AISummary />
+        <GuardianHero />
         <MetricGrid />
         <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
           <div className="flex flex-col gap-6">
             <ChartsCard range={range} setRange={setRange} />
             <InfraStatus />
+            <IncidentTimeline />
             <ServicesPreview />
           </div>
-          <EventFeed />
+          <div className="flex flex-col gap-6">
+            <GuardianInsights />
+            <EventFeed />
+          </div>
         </div>
       </div>
     </AppShell>
@@ -56,48 +78,86 @@ function PageHeader() {
   return (
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">Is my homelab healthy? At a glance.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Operations Center</h1>
+        <p className="text-sm text-muted-foreground">Guardian is watching your homelab in real time.</p>
       </div>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="status-dot text-success" />
+        <span className="relative inline-flex h-2 w-2 text-success">
+          <span className="status-dot-pulse" />
+          <span className="ping-dot" />
+        </span>
         All systems operational
       </div>
     </div>
   );
 }
 
-function AISummary() {
+function GuardianHero() {
+  const [secondsAgo, setSecondsAgo] = useState(12);
+  useEffect(() => {
+    const id = setInterval(() => setSecondsAgo((s) => (s >= 59 ? 1 : s + 1)), 1000);
+    return () => clearInterval(id);
+  }, []);
+
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 8 }}
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className="surface-card relative overflow-hidden p-5 md:p-6"
+      className="surface-card glow-primary relative overflow-hidden p-6 md:p-8"
     >
-      <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-primary/20 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -left-10 h-64 w-64 rounded-full bg-chart-5/15 blur-3xl" />
-      <div className="relative flex flex-col gap-4 md:flex-row md:items-start">
-        <div className="grid h-12 w-12 shrink-0 place-items-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/30">
-          <Brain className="h-6 w-6" />
+      <div className="pointer-events-none absolute -right-32 -top-32 h-80 w-80 rounded-full bg-primary/25 blur-3xl" />
+      <div className="pointer-events-none absolute -bottom-24 left-1/3 h-64 w-64 rounded-full bg-chart-5/20 blur-3xl" />
+      <div className="pointer-events-none absolute inset-0 opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle at 1px 1px, white 1px, transparent 0)", backgroundSize: "24px 24px" }} />
+
+      <div className="relative grid items-center gap-6 md:grid-cols-[auto_1fr_auto]">
+        <div className="flex flex-col items-center gap-2">
+          <HealthRing value={98} />
+          <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+            <Clock className="h-3 w-3" />
+            Last analysis · <span className="tabular-nums">{secondsAgo}s ago</span>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
+
+        <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h2 className="text-base font-semibold">Guardian AI</h2>
-            <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success">Healthy</span>
+            <div className="grid h-10 w-10 place-items-center rounded-xl bg-primary/15 text-primary ring-1 ring-primary/30">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="shimmer-text text-xl font-semibold tracking-tight">Guardian AI</h2>
+                <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success ring-1 ring-success/30">Healthy</span>
+              </div>
+              <p className="text-xs text-muted-foreground">Autonomous SRE · v1.2.0</p>
+            </div>
           </div>
-          <p className="mt-1 text-sm text-foreground/90">
-            Everything looks healthy. <span className="text-muted-foreground">1 container restarted today. CPU stable. Memory normal. No critical alerts.</span>
-          </p>
-          <div className="mt-3 rounded-md border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning-foreground/90">
-            <span className="font-medium text-warning">Recommendation:</span>{" "}
-            <span className="text-foreground/80">Increase RAM limit of <code className="rounded bg-background/50 px-1">n8n</code> — peaked at 812MB / 1GB twice today.</span>
+
+          <ul className="mt-4 space-y-1.5 text-sm">
+            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> 42 services healthy</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> 2 incidents auto-recovered today</li>
+            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> No critical alerts</li>
+          </ul>
+
+          <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5">
+            <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-warning">
+              <Lightbulb className="h-3.5 w-3.5" /> Recommendation
+            </div>
+            <p className="mt-1 text-sm text-foreground/90">
+              Increase <code className="rounded bg-background/50 px-1 text-warning">n8n</code> memory limit to <span className="font-medium">768MB</span> — peaked at 812MB / 1GB twice today.
+            </p>
           </div>
         </div>
-        <button className="self-start rounded-md border border-border bg-card px-3 py-1.5 text-xs hover:bg-accent">
-          View details
-        </button>
+
+        <div className="flex md:flex-col gap-2">
+          <button className="inline-flex items-center justify-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:opacity-90">
+            Apply fix <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+          <button className="inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-card px-4 py-2 text-sm hover:bg-accent">
+            View details
+          </button>
+        </div>
       </div>
-    </motion.div>
+    </motion.section>
   );
 }
 
@@ -106,27 +166,34 @@ function MetricGrid() {
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
       {topMetrics.map((m, i) => {
         const Icon = (Icons as any)[m.icon] ?? Cpu;
+        const aText = accentText[m.accent] ?? "text-primary";
         return (
           <motion.div
             key={m.id}
-            initial={{ opacity: 0, y: 8 }}
+            initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.03 }}
-            whileHover={{ y: -2 }}
-            className="surface-card p-4"
+            transition={{ delay: i * 0.04 }}
+            whileHover={{ y: -3 }}
+            className={`surface-card relative overflow-hidden p-4 transition-shadow hover:${accentGlow[m.accent] ?? "glow-primary"}`}
           >
-            <div className="flex items-start justify-between">
-              <div className={`grid h-8 w-8 place-items-center rounded-md bg-card/80 ${statusColor[m.status]}`}>
-                <Icon className="h-4 w-4" />
+            <div className={`pointer-events-none absolute -right-8 -top-8 h-20 w-20 rounded-full opacity-20 blur-2xl ${statusBg[m.status]}`} />
+            <div className="relative">
+              <div className="flex items-start justify-between">
+                <div className={`grid h-8 w-8 place-items-center rounded-md bg-background/60 ring-1 ring-border ${aText}`}>
+                  <Icon className="h-4 w-4" />
+                </div>
+                <span className="relative inline-flex h-2 w-2 text-current">
+                  <span className={`status-dot-pulse ${statusColor[m.status]}`} />
+                  {m.status !== "healthy" && <span className={`ping-dot ${statusColor[m.status]}`} />}
+                </span>
               </div>
-              <span className={`status-dot ${statusColor[m.status]}`} />
-            </div>
-            <div className="mt-3 text-[11px] uppercase tracking-wide text-muted-foreground">{m.label}</div>
-            <div className="mt-0.5 text-2xl font-semibold tabular-nums">
-              {m.display ?? (<><AnimatedNumber value={m.value} />{m.suffix}</>)}
-            </div>
-            <div className={`mt-2 ${statusColor[m.status]}`}>
-              <Sparkline data={m.trend} height={28} />
+              <div className="mt-3 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{m.label}</div>
+              <div className="mt-0.5 text-3xl font-semibold leading-tight tabular-nums">
+                {m.display ?? (<><AnimatedNumber value={m.value} /><span className="text-base text-muted-foreground">{m.suffix}</span></>)}
+              </div>
+              <div className={`mt-2 ${aText}`}>
+                <Sparkline data={m.trend} height={28} />
+              </div>
             </div>
           </motion.div>
         );
@@ -137,17 +204,17 @@ function MetricGrid() {
 
 function ChartsCard({ range, setRange }: { range: string; setRange: (r: any) => void }) {
   const charts = [
-    { key: "cpu", label: "CPU", color: "var(--color-chart-1)", data: genSeries(48, 25, 15) },
-    { key: "ram", label: "RAM", color: "var(--color-chart-2)", data: genSeries(48, 52, 10) },
-    { key: "disk", label: "Disk I/O", color: "var(--color-chart-3)", data: genSeries(48, 30, 25) },
-    { key: "net", label: "Network", color: "var(--color-chart-5)", data: genSeries(48, 40, 30) },
+    { key: "cpu", label: "CPU", color: "var(--color-chart-1)", unit: "%", data: genSeries(48, 21, 12) },
+    { key: "ram", label: "RAM", color: "var(--color-chart-2)", unit: "%", data: genSeries(48, 53, 8) },
+    { key: "disk", label: "Disk I/O", color: "var(--color-chart-3)", unit: "%", data: genSeries(48, 34, 22) },
+    { key: "net", label: "Network", color: "var(--color-chart-5)", unit: "%", data: genSeries(48, 40, 26) },
   ];
   return (
     <section className="surface-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <BarChart3 className="h-4 w-4 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">Live charts</h3>
+          <Activity className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Live resource metrics</h3>
         </div>
         <div className="flex rounded-md border border-border bg-card p-0.5 text-xs">
           {ranges.map((r) => (
@@ -162,34 +229,53 @@ function ChartsCard({ range, setRange }: { range: string; setRange: (r: any) => 
         </div>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
-        {charts.map((c) => (
-          <div key={c.key} className="rounded-md border border-border bg-background/40 p-3">
-            <div className="mb-1 flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{c.label}</span>
-              <span className="font-medium tabular-nums">{Math.round(c.data[c.data.length - 1].v)}%</span>
+        {charts.map((c) => {
+          const current = c.data[c.data.length - 1].v;
+          const peak = Math.max(...c.data.map((d) => d.v));
+          const avg = c.data.reduce((s, d) => s + d.v, 0) / c.data.length;
+          return (
+            <div key={c.key} className="rounded-lg border border-border bg-background/40 p-4">
+              <div className="mb-2 flex items-end justify-between">
+                <div>
+                  <div className="text-xs uppercase tracking-wider text-muted-foreground">{c.label}</div>
+                  <div className="mt-0.5 text-3xl font-semibold tabular-nums" style={{ color: c.color }}>
+                    {Math.round(current)}<span className="text-base text-muted-foreground">{c.unit}</span>
+                  </div>
+                </div>
+                <div className="flex gap-4 text-right text-[11px]">
+                  <div>
+                    <div className="text-muted-foreground">Peak</div>
+                    <div className="tabular-nums font-medium">{Math.round(peak)}{c.unit}</div>
+                  </div>
+                  <div>
+                    <div className="text-muted-foreground">Avg</div>
+                    <div className="tabular-nums font-medium">{Math.round(avg)}{c.unit}</div>
+                  </div>
+                </div>
+              </div>
+              <div className="h-44">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={c.data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
+                    <defs>
+                      <linearGradient id={`g-${c.key}`} x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor={c.color} stopOpacity={0.55} />
+                        <stop offset="100%" stopColor={c.color} stopOpacity={0} />
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
+                    <XAxis dataKey="t" hide />
+                    <YAxis hide domain={[0, 100]} />
+                    <Tooltip
+                      contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }}
+                      labelStyle={{ color: "var(--color-muted-foreground)" }}
+                    />
+                    <Area type="monotone" dataKey="v" stroke={c.color} strokeWidth={2} fill={`url(#g-${c.key})`} isAnimationActive />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
             </div>
-            <div className="h-32">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={c.data} margin={{ top: 4, right: 4, bottom: 0, left: 0 }}>
-                  <defs>
-                    <linearGradient id={`g-${c.key}`} x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor={c.color} stopOpacity={0.5} />
-                      <stop offset="100%" stopColor={c.color} stopOpacity={0} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid stroke="var(--color-border)" strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="t" hide />
-                  <YAxis hide domain={[0, 100]} />
-                  <Tooltip
-                    contentStyle={{ background: "var(--color-popover)", border: "1px solid var(--color-border)", borderRadius: 8, fontSize: 12 }}
-                    labelStyle={{ color: "var(--color-muted-foreground)" }}
-                  />
-                  <Area type="monotone" dataKey="v" stroke={c.color} strokeWidth={2} fill={`url(#g-${c.key})`} />
-                </AreaChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -199,30 +285,68 @@ function InfraStatus() {
   return (
     <section className="surface-card p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Live infrastructure status</h3>
-        <span className="text-xs text-muted-foreground">Top to bottom flow</span>
+        <h3 className="text-sm font-semibold">Infrastructure topology</h3>
+        <span className="text-xs text-muted-foreground">Click a node for details</span>
       </div>
       <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center md:justify-between md:overflow-x-auto">
         {infraNodes.map((n, i) => (
           <div key={n.id} className="flex items-center md:flex-col md:gap-2">
-            <motion.div
-              whileHover={{ scale: 1.04 }}
-              className={`group relative flex min-w-[140px] flex-1 items-center gap-3 rounded-lg border border-border bg-background/40 px-3 py-2.5 md:flex-col md:items-center md:text-center`}
+            <motion.button
+              whileHover={{ scale: 1.04, y: -2 }}
+              whileTap={{ scale: 0.98 }}
+              className="group relative flex min-w-[150px] flex-1 items-center gap-3 rounded-lg border border-border bg-background/40 px-3 py-3 text-left md:flex-col md:items-center md:text-center"
             >
-              <span className={`status-dot ${statusColor[n.status]}`} />
+              <span className="relative inline-flex h-2 w-2 text-current">
+                <span className={`status-dot-pulse ${statusColor[n.status]}`} />
+                {n.status !== "healthy" && <span className={`ping-dot ${statusColor[n.status]}`} />}
+              </span>
               <div className="min-w-0">
                 <div className="text-sm font-medium truncate">{n.label}</div>
                 <div className="text-[11px] text-muted-foreground">
                   {Object.entries(n.meta).map(([k, v]) => `${k}: ${v}`).join(" · ")}
                 </div>
               </div>
-            </motion.div>
+            </motion.button>
             {i < infraNodes.length - 1 && (
               <ChevronRight className="mx-2 h-4 w-4 shrink-0 rotate-90 text-muted-foreground md:rotate-0" />
             )}
           </div>
         ))}
       </div>
+    </section>
+  );
+}
+
+function IncidentTimeline() {
+  return (
+    <section className="surface-card p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 text-warning" />
+          <h3 className="text-sm font-semibold">Latest incident</h3>
+          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success ring-1 ring-success/30">Resolved · MTTR 2m 12s</span>
+        </div>
+        <button className="text-xs text-primary hover:underline">All incidents</button>
+      </div>
+      <ol className="relative ml-2">
+        <span className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
+        {incidentTimeline.map((step, i) => (
+          <motion.li
+            key={i}
+            initial={{ opacity: 0, x: 8 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.08 }}
+            className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
+          >
+            <span className={`mt-1.5 status-dot ${statusColor[step.status]} z-10`} />
+            <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
+            <div>
+              <div className="text-sm font-medium">{step.text}</div>
+              <div className="text-xs text-muted-foreground">{step.detail}</div>
+            </div>
+          </motion.li>
+        ))}
+      </ol>
     </section>
   );
 }
@@ -238,15 +362,18 @@ function ServicesPreview() {
         {services.map((s) => (
           <motion.div
             key={s.name}
-            whileHover={{ y: -2 }}
-            className="relative overflow-hidden rounded-lg border border-border bg-background/40 p-4"
+            whileHover={{ y: -3 }}
+            className={`relative overflow-hidden rounded-lg border border-border bg-background/40 p-4 transition-shadow hover:${s.status === "healthy" ? "glow-success" : s.status === "warning" ? "glow-warning" : "glow-danger"}`}
           >
-            <div className={`absolute inset-x-0 top-0 h-0.5 ${s.status === "healthy" ? "bg-success" : s.status === "warning" ? "bg-warning" : "bg-destructive"}`} />
+            <div className={`absolute inset-x-0 top-0 h-0.5 ${statusBg[s.status]}`} />
             <div className="flex items-start justify-between">
               <div>
                 <div className="font-medium">{s.name}</div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-xs">
-                  <span className={`status-dot ${statusColor[s.status]}`} />
+                  <span className="relative inline-flex h-2 w-2 text-current">
+                    <span className={`status-dot-pulse ${statusColor[s.status]}`} />
+                    {s.status !== "healthy" && <span className={`ping-dot ${statusColor[s.status]}`} />}
+                  </span>
                   <span className="capitalize text-muted-foreground">{s.status === "healthy" ? "Running" : s.status}</span>
                 </div>
               </div>
@@ -258,10 +385,10 @@ function ServicesPreview() {
                 Auto
               </label>
             </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-xs text-muted-foreground">
-              <div><div className="text-foreground tabular-nums">{s.cpu}%</div>CPU</div>
-              <div><div className="text-foreground tabular-nums">{s.ram}</div>RAM</div>
-              <div><div className="text-foreground tabular-nums">{s.uptime}</div>Uptime</div>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
+              <div><div className="text-base font-medium text-foreground tabular-nums">{s.cpu}%</div>CPU</div>
+              <div><div className="text-base font-medium text-foreground tabular-nums">{s.ram}</div>RAM</div>
+              <div><div className="text-base font-medium text-foreground tabular-nums">{s.uptime}</div>Uptime</div>
             </div>
             <div className="mt-3 flex gap-1.5">
               <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
@@ -281,23 +408,74 @@ function ServicesPreview() {
   );
 }
 
-function EventFeed() {
+function GuardianInsights() {
   return (
-    <aside className="surface-card flex max-h-[760px] flex-col p-5">
+    <section className="surface-card p-5">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="grid h-7 w-7 place-items-center rounded-md bg-primary/15 text-primary ring-1 ring-primary/30">
+          <Brain className="h-4 w-4" />
+        </div>
+        <h3 className="text-sm font-semibold">Guardian insights</h3>
+      </div>
+      <ul className="space-y-2">
+        {guardianInsights.map((ins, i) => (
+          <motion.li
+            key={i}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.06 }}
+            className="flex items-start gap-2 rounded-md border border-border bg-background/40 px-3 py-2 text-sm"
+          >
+            <span className={`mt-1.5 status-dot ${statusColor[ins.tone]}`} />
+            <span className="text-foreground/90">{ins.text}</span>
+          </motion.li>
+        ))}
+      </ul>
+      <div className="mt-3 rounded-md border border-primary/30 bg-primary/10 px-3 py-2.5 text-xs">
+        <div className="font-medium text-primary">Recommended action</div>
+        <p className="mt-0.5 text-foreground/90">Increase n8n memory limit to 768MB.</p>
+      </div>
+    </section>
+  );
+}
+
+function EventFeed() {
+  const [events, setEvents] = useState(liveEvents);
+  useEffect(() => {
+    const pool = [
+      { text: "Prometheus scrape ok", status: "healthy" as Status },
+      { text: "CPU normalized on n8n", status: "healthy" as Status },
+      { text: "New container deployed", status: "healthy" as Status },
+      { text: "Latency spike detected", status: "warning" as Status },
+    ];
+    const id = setInterval(() => {
+      const now = new Date();
+      const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+      const pick = pool[Math.floor(Math.random() * pool.length)];
+      setEvents((prev) => [{ time, ...pick }, ...prev].slice(0, 12));
+    }, 6000);
+    return () => clearInterval(id);
+  }, []);
+
+  return (
+    <aside className="surface-card flex max-h-[560px] flex-col p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-semibold">Live event feed</h3>
         <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-          <span className="status-dot text-success" />
+          <span className="relative inline-flex h-2 w-2 text-success">
+            <span className="status-dot-pulse" />
+            <span className="ping-dot" />
+          </span>
           Streaming
         </span>
       </div>
       <ol className="relative ml-2 flex-1 space-y-3 overflow-y-auto pr-1">
-        {liveEvents.map((e, i) => (
+        {events.map((e, i) => (
           <motion.li
-            key={i}
-            initial={{ opacity: 0, x: 6 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.04 }}
+            key={`${e.time}-${i}-${e.text}`}
+            initial={{ opacity: 0, x: 8, height: 0 }}
+            animate={{ opacity: 1, x: 0, height: "auto" }}
+            transition={{ duration: 0.3 }}
             className="relative pl-5"
           >
             <span className={`absolute left-0 top-1.5 status-dot ${statusColor[e.status]}`} />
