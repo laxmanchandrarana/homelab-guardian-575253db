@@ -34,11 +34,13 @@ export function TopBar() {
 
       <div className="ml-auto flex items-center gap-1 sm:ml-3 sm:gap-2">
         <div className="hidden md:flex items-center gap-2 rounded-md bg-card px-2.5 py-1.5 text-xs">
-          <span className="status-dot text-success" />
-          <span className="text-muted-foreground">Connected</span>
+          <span className={`status-dot ${connected ? "text-success" : API_CONFIGURED ? "text-warning" : "text-muted-foreground"}`} />
+          <span className="text-muted-foreground">
+            {API_CONFIGURED ? (connected ? "Connected" : "Reconnecting…") : "Offline (demo)"}
+          </span>
         </div>
-        <div className="hidden lg:block text-xs tabular-nums text-muted-foreground">
-          {time.toLocaleTimeString()}
+        <div className="hidden lg:block text-xs tabular-nums text-muted-foreground" suppressHydrationWarning>
+          {time ? time.toLocaleTimeString() : ""}
         </div>
         <IconBtn label="Notifications">
           <Bell className="h-4 w-4" />
