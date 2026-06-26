@@ -446,62 +446,6 @@ function ServicesPreview() {
   );
 }
 
-function ServicesPreview() {
-  return (
-    <section className="surface-card p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Services</h3>
-        <button className="text-xs text-primary hover:underline">View all</button>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {services.map((s) => (
-          <motion.div
-            key={s.name}
-            whileHover={{ y: -3 }}
-            className={`relative overflow-hidden rounded-lg border border-border bg-background/40 p-4 transition-shadow hover:${s.status === "healthy" ? "glow-success" : s.status === "warning" ? "glow-warning" : "glow-danger"}`}
-          >
-            <div className={`absolute inset-x-0 top-0 h-0.5 ${statusBg[s.status]}`} />
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="font-medium">{s.name}</div>
-                <div className="mt-0.5 flex items-center gap-1.5 text-xs">
-                  <span className="relative inline-flex h-2 w-2 text-current">
-                    <span className={`status-dot-pulse ${statusColor[s.status]}`} />
-                    {s.status !== "healthy" && <span className={`ping-dot ${statusColor[s.status]}`} />}
-                  </span>
-                  <span className="capitalize text-muted-foreground">{s.status === "healthy" ? "Running" : s.status}</span>
-                </div>
-              </div>
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-[10px] text-muted-foreground">
-                <input type="checkbox" defaultChecked={s.autoHeal} className="peer sr-only" />
-                <span className="relative h-4 w-7 rounded-full bg-muted transition-colors peer-checked:bg-primary">
-                  <span className="absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-foreground transition-transform peer-checked:translate-x-3" />
-                </span>
-                Auto
-              </label>
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
-              <div><div className="text-base font-medium text-foreground tabular-nums">{s.cpu}%</div>CPU</div>
-              <div><div className="text-base font-medium text-foreground tabular-nums">{s.ram}</div>RAM</div>
-              <div><div className="text-base font-medium text-foreground tabular-nums">{s.uptime}</div>Uptime</div>
-            </div>
-            <div className="mt-3 flex gap-1.5">
-              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
-                <RotateCw className="h-3 w-3" /> Restart
-              </button>
-              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
-                <FileText className="h-3 w-3" /> Logs
-              </button>
-              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
-                <BarChart3 className="h-3 w-3" /> Metrics
-              </button>
-            </div>
-          </motion.div>
-        ))}
-      </div>
-    </section>
-  );
-}
 
 function GuardianInsights() {
   return (
