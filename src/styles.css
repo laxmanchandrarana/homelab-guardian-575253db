@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @source "../src";
+@source inline("hover:glow-success hover:glow-warning hover:glow-danger hover:glow-primary");
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
@@ -135,4 +136,50 @@
   height: 0.5rem;
   border-radius: 9999px;
   box-shadow: 0 0 0 3px color-mix(in oklab, currentColor 25%, transparent);
+}
+
+@utility status-dot-pulse {
+  display: inline-block;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background: currentColor;
+  position: relative;
+}
+@utility glow-success {
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-success) 25%, transparent), 0 0 32px -8px color-mix(in oklab, var(--color-success) 45%, transparent);
+}
+@utility glow-warning {
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-warning) 30%, transparent), 0 0 32px -8px color-mix(in oklab, var(--color-warning) 50%, transparent);
+}
+@utility glow-danger {
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-destructive) 30%, transparent), 0 0 32px -8px color-mix(in oklab, var(--color-destructive) 50%, transparent);
+}
+@utility glow-primary {
+  box-shadow: 0 0 0 1px color-mix(in oklab, var(--color-primary) 30%, transparent), 0 0 32px -8px color-mix(in oklab, var(--color-primary) 50%, transparent);
+}
+
+@keyframes ping-soft {
+  0% { transform: scale(1); opacity: 0.7; }
+  80%, 100% { transform: scale(2.6); opacity: 0; }
+}
+@utility ping-dot {
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  background: currentColor;
+  animation: ping-soft 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@utility shimmer-text {
+  background: linear-gradient(90deg, var(--color-foreground) 0%, color-mix(in oklab, var(--color-primary) 80%, white) 50%, var(--color-foreground) 100%);
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shimmer 6s linear infinite;
 }
