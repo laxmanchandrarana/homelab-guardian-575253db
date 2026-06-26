@@ -170,9 +170,10 @@ function GuardianHero() {
 }
 
 function MetricGrid() {
+  const { metrics } = useMonitoring();
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-      {topMetrics.map((m, i) => {
+      {(metrics as typeof mockTopMetrics).map((m, i) => {
         const Icon = (Icons as any)[m.icon] ?? Cpu;
         const aText = accentText[m.accent] ?? "text-primary";
         return (
