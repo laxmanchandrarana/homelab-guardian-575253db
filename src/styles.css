@@ -1,5 +1,6 @@
 @import "tailwindcss" source(none);
 @source "../src";
+@source inline("hover:glow-success hover:glow-warning hover:glow-danger hover:glow-primary");
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
