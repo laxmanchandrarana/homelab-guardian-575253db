@@ -9,7 +9,10 @@ import { AppShell } from "@/components/AppShell";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { Sparkline } from "@/components/Sparkline";
 import { HealthRing } from "@/components/HealthRing";
-import { topMetrics, services, liveEvents, infraNodes, incidentTimeline, guardianInsights, genSeries, type Status } from "@/lib/mock-data";
+import { topMetrics as mockTopMetrics, liveEvents as fallbackEvents, infraNodes, guardianInsights, genSeries, type Status } from "@/lib/mock-data";
+import { useMonitoring, useServices, useIncidents, useNotifications } from "@/hooks/useGuardianData";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { endpoints, API_CONFIGURED } from "@/lib/api";
 import * as Icons from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -69,6 +72,11 @@ function Dashboard() {
             <EventFeed />
           </div>
         </div>
+        {!API_CONFIGURED && (
+          <div className="rounded-lg border border-warning/30 bg-warning/10 px-4 py-3 text-xs text-warning">
+            Demo mode — set <code className="rounded bg-background/50 px-1">VITE_API_URL</code> (e.g. <code className="rounded bg-background/50 px-1">http://100.93.15.3:8008</code>) to connect Guardian's FastAPI backend.
+          </div>
+        )}
       </div>
     </AppShell>
   );
@@ -162,9 +170,10 @@ function GuardianHero() {
 }
 
 function MetricGrid() {
+  const { metrics } = useMonitoring();
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-8">
-      {topMetrics.map((m, i) => {
+      {(metrics as typeof mockTopMetrics).map((m, i) => {
         const Icon = (Icons as any)[m.icon] ?? Cpu;
         const aText = accentText[m.accent] ?? "text-primary";
         return (
@@ -318,46 +327,70 @@ function InfraStatus() {
 }
 
 function IncidentTimeline() {
+  const { timeline, isLive } = useIncidents();
+  const resolved = timeline.length > 0 && timeline[timeline.length - 1].status === "healthy";
   return (
     <section className="surface-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-warning" />
-          <h3 className="text-sm font-semibold">Latest incident</h3>
-          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success ring-1 ring-success/30">Resolved · MTTR 2m 12s</span>
+          <h3 className="text-sm font-semibold">{isLive ? "Recent incidents" : "Latest incident"}</h3>
+          {resolved && (
+            <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success ring-1 ring-success/30">Resolved</span>
+          )}
         </div>
         <button className="text-xs text-primary hover:underline">All incidents</button>
       </div>
-      <ol className="relative ml-2">
-        <span className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
-        {incidentTimeline.map((step, i) => (
-          <motion.li
-            key={i}
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
-          >
-            <span className={`mt-1.5 status-dot ${statusColor[step.status]} z-10`} />
-            <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
-            <div>
-              <div className="text-sm font-medium">{step.text}</div>
-              <div className="text-xs text-muted-foreground">{step.detail}</div>
-            </div>
-          </motion.li>
-        ))}
-      </ol>
+      {timeline.length === 0 ? (
+        <div className="rounded-md border border-border bg-background/40 px-3 py-6 text-center text-xs text-muted-foreground">No incidents — Guardian is calm.</div>
+      ) : (
+        <ol className="relative ml-2">
+          <span className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
+          {timeline.map((step, i) => (
+            <motion.li
+              key={i}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.08 }}
+              className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
+            >
+              <span className={`mt-1.5 status-dot ${statusColor[step.status]} z-10`} />
+              <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
+              <div>
+                <div className="text-sm font-medium">{step.text}</div>
+                <div className="text-xs text-muted-foreground">{step.detail}</div>
+              </div>
+            </motion.li>
+          ))}
+        </ol>
+      )}
     </section>
   );
 }
 
 function ServicesPreview() {
+  const { services, isLoading } = useServices();
+  const qc = useQueryClient();
+  const restart = useMutation({
+    mutationFn: (name: string) => endpoints.restartService(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["services"] });
+      qc.invalidateQueries({ queryKey: ["incidents"] });
+    },
+  });
   return (
     <section className="surface-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-semibold">Services</h3>
         <button className="text-xs text-primary hover:underline">View all</button>
       </div>
+      {isLoading && services.length === 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 animate-pulse rounded-lg border border-border bg-background/40" />
+          ))}
+        </div>
+      ) : (
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {services.map((s) => (
           <motion.div
@@ -391,8 +424,12 @@ function ServicesPreview() {
               <div><div className="text-base font-medium text-foreground tabular-nums">{s.uptime}</div>Uptime</div>
             </div>
             <div className="mt-3 flex gap-1.5">
-              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
-                <RotateCw className="h-3 w-3" /> Restart
+              <button
+                onClick={() => API_CONFIGURED && restart.mutate(s.name)}
+                disabled={restart.isPending && restart.variables === s.name}
+                className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-50"
+              >
+                <RotateCw className={`h-3 w-3 ${restart.isPending && restart.variables === s.name ? "animate-spin" : ""}`} /> Restart
               </button>
               <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
                 <FileText className="h-3 w-3" /> Logs
@@ -404,9 +441,11 @@ function ServicesPreview() {
           </motion.div>
         ))}
       </div>
+      )}
     </section>
   );
 }
+
 
 function GuardianInsights() {
   return (
@@ -440,8 +479,19 @@ function GuardianInsights() {
 }
 
 function EventFeed() {
-  const [events, setEvents] = useState(liveEvents);
+  const { events: liveData, isLive } = useNotifications();
+  const [events, setEvents] = useState<{ time: string; text: string; status: Status }[]>(
+    isLive ? liveData : fallbackEvents
+  );
+
+  // Mirror live data into local state when it changes
   useEffect(() => {
+    if (isLive) setEvents(liveData);
+  }, [liveData, isLive]);
+
+  // In demo mode, simulate streaming
+  useEffect(() => {
+    if (API_CONFIGURED) return;
     const pool = [
       { text: "Prometheus scrape ok", status: "healthy" as Status },
       { text: "CPU normalized on n8n", status: "healthy" as Status },
@@ -466,9 +516,12 @@ function EventFeed() {
             <span className="status-dot-pulse" />
             <span className="ping-dot" />
           </span>
-          Streaming
+          {isLive ? "Streaming" : "Demo"}
         </span>
       </div>
+      {events.length === 0 ? (
+        <div className="rounded-md border border-border bg-background/40 px-3 py-8 text-center text-xs text-muted-foreground">No events yet.</div>
+      ) : (
       <ol className="relative ml-2 flex-1 space-y-3 overflow-y-auto pr-1">
         {events.map((e, i) => (
           <motion.li
@@ -484,6 +537,8 @@ function EventFeed() {
           </motion.li>
         ))}
       </ol>
+      )}
     </aside>
   );
 }
+

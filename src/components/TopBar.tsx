@@ -1,12 +1,18 @@
 import { Bell, Moon, Search, Settings, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useGuardianSocket } from "@/hooks/useGuardianSocket";
+import { API_CONFIGURED } from "@/lib/api";
 
 export function TopBar() {
-  const [time, setTime] = useState(() => new Date());
+  // Initialize as null to avoid SSR/CSR hydration mismatch on the clock.
+  const [time, setTime] = useState<Date | null>(null);
   useEffect(() => {
+    setTime(new Date());
     const id = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
+  const { status } = useGuardianSocket();
+  const connected = status === "open";
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md md:px-6">
@@ -28,11 +34,13 @@ export function TopBar() {
 
       <div className="ml-auto flex items-center gap-1 sm:ml-3 sm:gap-2">
         <div className="hidden md:flex items-center gap-2 rounded-md bg-card px-2.5 py-1.5 text-xs">
-          <span className="status-dot text-success" />
-          <span className="text-muted-foreground">Connected</span>
+          <span className={`status-dot ${connected ? "text-success" : API_CONFIGURED ? "text-warning" : "text-muted-foreground"}`} />
+          <span className="text-muted-foreground">
+            {API_CONFIGURED ? (connected ? "Connected" : "Reconnecting…") : "Offline (demo)"}
+          </span>
         </div>
-        <div className="hidden lg:block text-xs tabular-nums text-muted-foreground">
-          {time.toLocaleTimeString()}
+        <div className="hidden lg:block text-xs tabular-nums text-muted-foreground" suppressHydrationWarning>
+          {time ? time.toLocaleTimeString() : ""}
         </div>
         <IconBtn label="Notifications">
           <Bell className="h-4 w-4" />
