@@ -327,35 +327,121 @@ function InfraStatus() {
 }
 
 function IncidentTimeline() {
+  const { timeline, isLive } = useIncidents();
+  const resolved = timeline.length > 0 && timeline[timeline.length - 1].status === "healthy";
   return (
     <section className="surface-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <AlertTriangle className="h-4 w-4 text-warning" />
-          <h3 className="text-sm font-semibold">Latest incident</h3>
-          <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success ring-1 ring-success/30">Resolved · MTTR 2m 12s</span>
+          <h3 className="text-sm font-semibold">{isLive ? "Recent incidents" : "Latest incident"}</h3>
+          {resolved && (
+            <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success ring-1 ring-success/30">Resolved</span>
+          )}
         </div>
         <button className="text-xs text-primary hover:underline">All incidents</button>
       </div>
-      <ol className="relative ml-2">
-        <span className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
-        {incidentTimeline.map((step, i) => (
-          <motion.li
-            key={i}
-            initial={{ opacity: 0, x: 8 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: i * 0.08 }}
-            className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
+      {timeline.length === 0 ? (
+        <div className="rounded-md border border-border bg-background/40 px-3 py-6 text-center text-xs text-muted-foreground">No incidents — Guardian is calm.</div>
+      ) : (
+        <ol className="relative ml-2">
+          <span className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
+          {timeline.map((step, i) => (
+            <motion.li
+              key={i}
+              initial={{ opacity: 0, x: 8 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: i * 0.08 }}
+              className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
+            >
+              <span className={`mt-1.5 status-dot ${statusColor[step.status]} z-10`} />
+              <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
+              <div>
+                <div className="text-sm font-medium">{step.text}</div>
+                <div className="text-xs text-muted-foreground">{step.detail}</div>
+              </div>
+            </motion.li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
+function ServicesPreview() {
+  const { services, isLoading } = useServices();
+  const qc = useQueryClient();
+  const restart = useMutation({
+    mutationFn: (name: string) => endpoints.restartService(name),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["services"] });
+      qc.invalidateQueries({ queryKey: ["incidents"] });
+    },
+  });
+  return (
+    <section className="surface-card p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <h3 className="text-sm font-semibold">Services</h3>
+        <button className="text-xs text-primary hover:underline">View all</button>
+      </div>
+      {isLoading && services.length === 0 ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="h-32 animate-pulse rounded-lg border border-border bg-background/40" />
+          ))}
+        </div>
+      ) : (
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        {services.map((s) => (
+          <motion.div
+            key={s.name}
+            whileHover={{ y: -3 }}
+            className={`relative overflow-hidden rounded-lg border border-border bg-background/40 p-4 transition-shadow hover:${s.status === "healthy" ? "glow-success" : s.status === "warning" ? "glow-warning" : "glow-danger"}`}
           >
-            <span className={`mt-1.5 status-dot ${statusColor[step.status]} z-10`} />
-            <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
-            <div>
-              <div className="text-sm font-medium">{step.text}</div>
-              <div className="text-xs text-muted-foreground">{step.detail}</div>
+            <div className={`absolute inset-x-0 top-0 h-0.5 ${statusBg[s.status]}`} />
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="font-medium">{s.name}</div>
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs">
+                  <span className="relative inline-flex h-2 w-2 text-current">
+                    <span className={`status-dot-pulse ${statusColor[s.status]}`} />
+                    {s.status !== "healthy" && <span className={`ping-dot ${statusColor[s.status]}`} />}
+                  </span>
+                  <span className="capitalize text-muted-foreground">{s.status === "healthy" ? "Running" : s.status}</span>
+                </div>
+              </div>
+              <label className="inline-flex cursor-pointer items-center gap-1.5 text-[10px] text-muted-foreground">
+                <input type="checkbox" defaultChecked={s.autoHeal} className="peer sr-only" />
+                <span className="relative h-4 w-7 rounded-full bg-muted transition-colors peer-checked:bg-primary">
+                  <span className="absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-foreground transition-transform peer-checked:translate-x-3" />
+                </span>
+                Auto
+              </label>
             </div>
-          </motion.li>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
+              <div><div className="text-base font-medium text-foreground tabular-nums">{s.cpu}%</div>CPU</div>
+              <div><div className="text-base font-medium text-foreground tabular-nums">{s.ram}</div>RAM</div>
+              <div><div className="text-base font-medium text-foreground tabular-nums">{s.uptime}</div>Uptime</div>
+            </div>
+            <div className="mt-3 flex gap-1.5">
+              <button
+                onClick={() => API_CONFIGURED && restart.mutate(s.name)}
+                disabled={restart.isPending && restart.variables === s.name}
+                className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-50"
+              >
+                <RotateCw className={`h-3 w-3 ${restart.isPending && restart.variables === s.name ? "animate-spin" : ""}`} /> Restart
+              </button>
+              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
+                <FileText className="h-3 w-3" /> Logs
+              </button>
+              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
+                <BarChart3 className="h-3 w-3" /> Metrics
+              </button>
+            </div>
+          </motion.div>
         ))}
-      </ol>
+      </div>
+      )}
     </section>
   );
 }
