@@ -301,6 +301,16 @@ export function useServiceDetail(name: string | null) {
   });
 }
 
+export function useIncidentDetail(id: string | number | null) {
+  return useQuery({
+    queryKey: ["incident-detail", id],
+    queryFn: () => endpoints.incidentDetail(id as string | number),
+    enabled: API_CONFIGURED && id != null,
+    refetchInterval: 15000,
+    retry: 1,
+  });
+}
+
 export function useServiceLogs(name: string | null, paused = false) {
   return useQuery({
     queryKey: ["service-logs", name],
