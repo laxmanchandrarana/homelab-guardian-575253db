@@ -221,12 +221,22 @@ function MetricGrid() {
 }
 
 function ChartsCard({ range, setRange }: { range: string; setRange: (r: any) => void }) {
+  const { series, isLive } = useMetrics();
   const charts = [
-    { key: "cpu", label: "CPU", color: "var(--color-chart-1)", unit: "%", data: genSeries(48, 21, 12) },
-    { key: "ram", label: "RAM", color: "var(--color-chart-2)", unit: "%", data: genSeries(48, 53, 8) },
-    { key: "disk", label: "Disk I/O", color: "var(--color-chart-3)", unit: "%", data: genSeries(48, 34, 22) },
-    { key: "net", label: "Network", color: "var(--color-chart-5)", unit: "%", data: genSeries(48, 40, 26) },
+    { key: "cpu", label: "CPU", color: "var(--color-chart-1)", unit: "%", data: series.cpu },
+    { key: "ram", label: "RAM", color: "var(--color-chart-2)", unit: "%", data: series.ram },
+    { key: "disk", label: "Disk I/O", color: "var(--color-chart-3)", unit: "%", data: series.disk },
+    { key: "net", label: "Network", color: "var(--color-chart-5)", unit: "%", data: series.net },
   ];
+  return (
+    <section className="surface-card p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Activity className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Live resource metrics</h3>
+          {isLive && <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-medium text-success ring-1 ring-success/30">LIVE</span>}
+        </div>
+
   return (
     <section className="surface-card p-5">
       <div className="mb-4 flex items-center justify-between">
