@@ -192,6 +192,7 @@ function ServicesPage() {
     return out;
   }, [rows, q, statusFilter, healthFilter, sort]);
 
+  const navigate = useNavigate();
   // Selection for bulk actions
   const [selected, setSelected] = useState<Set<string>>(new Set());
   function toggleSelect(name: string) {
