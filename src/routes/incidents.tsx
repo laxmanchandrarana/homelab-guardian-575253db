@@ -447,7 +447,7 @@ function IncidentsPage() {
               <CardTitle className="text-base">Recent Notifications</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {notifications.slice(0, 8).map((n, i) => (
+              {(notifications as unknown as NotifRow[]).slice(0, 8).map((n, i) => (
                 <div key={i} className="flex items-start gap-2 rounded-md border border-border/60 p-2 text-xs">
                   <Bell className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />
                   <div className="min-w-0 flex-1">
