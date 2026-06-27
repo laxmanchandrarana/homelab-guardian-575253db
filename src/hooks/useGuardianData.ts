@@ -261,6 +261,56 @@ export function useRestartService() {
   });
 }
 
+function makeServiceActionHook(
+  action: (name: string) => Promise<{ ok: boolean }>,
+  optimisticStatus: string,
+) {
+  return function useAction() {
+    const qc = useQueryClient();
+    return useMutation({
+      mutationFn: (name: string) => action(name),
+      onMutate: async (name: string) => {
+        await qc.cancelQueries({ queryKey: ["services"] });
+        const prev = qc.getQueryData<any[]>(["services"]);
+        if (prev) {
+          qc.setQueryData<any[]>(["services"], prev.map((s) =>
+            s.name === name ? { ...s, status: optimisticStatus } : s));
+        }
+        return { prev };
+      },
+      onError: (_e, _n, ctx) => { if (ctx?.prev) qc.setQueryData(["services"], ctx.prev); },
+      onSettled: () => {
+        qc.invalidateQueries({ queryKey: ["services"] });
+        qc.invalidateQueries({ queryKey: ["incidents"] });
+      },
+    });
+  };
+}
+
+export const useStartService = makeServiceActionHook(endpoints.startService, "starting");
+export const useStopService = makeServiceActionHook(endpoints.stopService, "stopping");
+export const useRestartServiceDirect = makeServiceActionHook(endpoints.restartServiceDirect, "restarting");
+
+export function useServiceDetail(name: string | null) {
+  return useQuery({
+    queryKey: ["service-detail", name],
+    queryFn: () => endpoints.serviceDetail(name as string),
+    enabled: API_CONFIGURED && !!name,
+    refetchInterval: 10000,
+    retry: 1,
+  });
+}
+
+export function useServiceLogs(name: string | null, paused = false) {
+  return useQuery({
+    queryKey: ["service-logs", name],
+    queryFn: () => endpoints.serviceLogs(name as string),
+    enabled: API_CONFIGURED && !!name && !paused,
+    refetchInterval: paused ? false : 4000,
+    retry: 1,
+  });
+}
+
 export function useRunScan() {
   const qc = useQueryClient();
   return useMutation({
@@ -272,3 +322,4 @@ export function useRunScan() {
 export function useCreateBackup() {
   return useMutation({ mutationFn: endpoints.createBackup });
 }
+

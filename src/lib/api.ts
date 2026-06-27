@@ -88,8 +88,22 @@ export type ServiceDTO = {
   lastRestart?: string;
   last_restart?: string;
   restart_count?: number;
+  restarts?: number;
   health?: string;
+  container_name?: string;
+  image?: string;
 };
+
+export type ServiceDetailDTO = ServiceDTO & {
+  ports?: (string | { container?: number | string; host?: number | string; protocol?: string })[];
+  networks?: string[];
+  volumes?: (string | { source?: string; target?: string })[];
+  env?: Record<string, string> | string[];
+  environment?: Record<string, string> | string[];
+  created?: string;
+  created_at?: string;
+};
+
 
 export type IncidentDTO = {
   id?: string | number;
@@ -142,6 +156,11 @@ export const endpoints = {
   monitoring: () => api<MonitoringDTO>("/monitoring"),
   dashboard: () => api<DashboardDTO>("/dashboard"),
   services: () => api<ServiceDTO[]>("/services"),
+  serviceDetail: (name: string) => api<ServiceDetailDTO>(`/services/${encodeURIComponent(name)}`),
+  serviceLogs: (name: string) => api<string | { logs?: string; lines?: string[] }>(`/services/${encodeURIComponent(name)}/logs`),
+  startService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/start`, { method: "POST" }),
+  stopService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/stop`, { method: "POST" }),
+  restartServiceDirect: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/restart`, { method: "POST" }),
   incidents: () => api<IncidentDTO[]>("/incidents"),
   metrics: (range?: RangeKey) => api<MetricsDTO>(`/metrics${range ? `?range=${range}` : ""}`),
   notifications: () => api<NotificationDTO[]>("/notifications"),
@@ -153,4 +172,5 @@ export const endpoints = {
   runScan: () => api<{ ok: boolean }>(`/scan`, { method: "POST" }),
   createBackup: () => api<{ ok: boolean }>(`/backup`, { method: "POST" }),
 };
+
 
