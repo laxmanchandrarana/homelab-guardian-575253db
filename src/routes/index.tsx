@@ -520,31 +520,42 @@ function GuardianInsights() {
   );
 }
 
-function EventFeed() {
-  const { events: liveData, isLive } = useNotifications();
-  const [events, setEvents] = useState<{ time: string; text: string; status: Status }[]>(
-    isLive ? liveData : fallbackEvents
-  );
+type FeedEvent = { time: string; text: string; status: Status; channel?: string; deliveryStatus?: string };
 
-  // Mirror live data into local state when it changes
+const channelIcon: Record<string, any> = {
+  telegram: Send,
+  discord: MessageCircle,
+  slack: Hash,
+  email: Mail,
+};
+
+const deliveryClass: Record<string, string> = {
+  delivered: "bg-success/15 text-success ring-success/30",
+  success: "bg-success/15 text-success ring-success/30",
+  pending: "bg-warning/15 text-warning ring-warning/30",
+  failed: "bg-destructive/15 text-destructive ring-destructive/30",
+};
+
+function EventFeed() {
+  const { events: liveData, isLive, isLoading, error, refetch } = useNotifications();
+  const [events, setEvents] = useState<FeedEvent[]>(isLive ? (liveData as FeedEvent[]) : (fallbackEvents as FeedEvent[]));
+
   useEffect(() => {
-    if (isLive) setEvents(liveData);
+    if (isLive) setEvents(liveData as FeedEvent[]);
   }, [liveData, isLive]);
 
-  // In demo mode, simulate streaming
   useEffect(() => {
     if (API_CONFIGURED) return;
-    const pool = [
-      { text: "Prometheus scrape ok", status: "healthy" as Status },
-      { text: "CPU normalized on n8n", status: "healthy" as Status },
-      { text: "New container deployed", status: "healthy" as Status },
-      { text: "Latency spike detected", status: "warning" as Status },
+    const pool: FeedEvent[] = [
+      { time: "", text: "Prometheus scrape ok", status: "healthy", channel: "slack", deliveryStatus: "delivered" },
+      { time: "", text: "CPU normalized on n8n", status: "healthy", channel: "telegram", deliveryStatus: "delivered" },
+      { time: "", text: "Latency spike detected", status: "warning", channel: "discord", deliveryStatus: "delivered" },
     ];
     const id = setInterval(() => {
       const now = new Date();
       const time = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
       const pick = pool[Math.floor(Math.random() * pool.length)];
-      setEvents((prev) => [{ time, ...pick }, ...prev].slice(0, 12));
+      setEvents((prev) => [{ ...pick, time }, ...prev].slice(0, 12));
     }, 6000);
     return () => clearInterval(id);
   }, []);
@@ -552,7 +563,7 @@ function EventFeed() {
   return (
     <aside className="surface-card flex max-h-[560px] flex-col p-5">
       <div className="mb-4 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">Live event feed</h3>
+        <h3 className="text-sm font-semibold">Notifications</h3>
         <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
           <span className="relative inline-flex h-2 w-2 text-success">
             <span className="status-dot-pulse" />
@@ -561,26 +572,246 @@ function EventFeed() {
           {isLive ? "Streaming" : "Demo"}
         </span>
       </div>
-      {events.length === 0 ? (
-        <div className="rounded-md border border-border bg-background/40 px-3 py-8 text-center text-xs text-muted-foreground">No events yet.</div>
+      {isLoading && events.length === 0 ? (
+        <SkeletonRows n={5} />
+      ) : error && events.length === 0 ? (
+        <ErrorCard message="Couldn't load notifications" onRetry={() => refetch()} />
+      ) : events.length === 0 ? (
+        <EmptyState label="No notifications yet" />
       ) : (
-      <ol className="relative ml-2 flex-1 space-y-3 overflow-y-auto pr-1">
-        {events.map((e, i) => (
-          <motion.li
-            key={`${e.time}-${i}-${e.text}`}
-            initial={{ opacity: 0, x: 8, height: 0 }}
-            animate={{ opacity: 1, x: 0, height: "auto" }}
-            transition={{ duration: 0.3 }}
-            className="relative pl-5"
-          >
-            <span className={`absolute left-0 top-1.5 status-dot ${statusColor[e.status]}`} />
-            <div className="text-xs tabular-nums text-muted-foreground">{e.time}</div>
-            <div className="text-sm">{e.text}</div>
-          </motion.li>
-        ))}
-      </ol>
+        <ol className="relative ml-2 flex-1 space-y-3 overflow-y-auto pr-1">
+          {events.map((e, i) => {
+            const ChIcon = e.channel ? channelIcon[e.channel] : null;
+            const delivery = e.deliveryStatus?.toLowerCase();
+            return (
+              <motion.li
+                key={`${e.time}-${i}-${e.text}`}
+                initial={{ opacity: 0, x: 8, height: 0 }}
+                animate={{ opacity: 1, x: 0, height: "auto" }}
+                transition={{ duration: 0.3 }}
+                className="relative pl-5"
+              >
+                <span className={`absolute left-0 top-1.5 status-dot ${statusColor[e.status]}`} />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs tabular-nums text-muted-foreground">{e.time}</div>
+                  {delivery && deliveryClass[delivery] && (
+                    <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wider ring-1 ${deliveryClass[delivery]}`}>
+                      {delivery}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-start gap-1.5 text-sm">
+                  {ChIcon && <ChIcon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" />}
+                  <span>{e.text}</span>
+                </div>
+              </motion.li>
+            );
+          })}
+        </ol>
       )}
     </aside>
   );
 }
+
+// ============= System status header =============
+
+function StatusBadge({ status }: { status?: string }) {
+  const v = (status ?? "healthy").toLowerCase();
+  const cls =
+    v.includes("crit") || v.includes("down") || v.includes("error")
+      ? "bg-destructive/15 text-destructive ring-destructive/30"
+      : v.includes("warn") || v.includes("degrad")
+      ? "bg-warning/15 text-warning ring-warning/30"
+      : "bg-success/15 text-success ring-success/30";
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1 ${cls}`}>
+      {status ?? "Healthy"}
+    </span>
+  );
+}
+
+function fmtRelative(iso?: string) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  const s = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (s < 60) return `${s}s ago`;
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
+function SystemStatusHeader() {
+  const { raw, healthScore, isLive } = useMonitoring();
+  const score = healthScore ?? 98;
+  return (
+    <section className="surface-card grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Overall health</div>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="text-2xl font-semibold tabular-nums"><AnimatedNumber value={score} />%</span>
+          <StatusBadge status={raw?.status ?? (score >= 90 ? "Healthy" : score >= 70 ? "Warning" : "Critical")} />
+        </div>
+      </div>
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Guardian</div>
+        <div className="mt-1 flex items-center gap-2">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <StatusBadge status={isLive ? "Online" : "Demo"} />
+        </div>
+      </div>
+      <div>
+        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">API</div>
+        <div className="mt-1 flex items-center gap-2">
+          <Activity className="h-4 w-4 text-primary" />
+          <StatusBadge status={raw?.api_status ?? (isLive ? "Reachable" : "Unreachable")} />
+        </div>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Last scan / update</div>
+        <div className="text-sm tabular-nums">{fmtRelative(raw?.last_scan)}</div>
+        <div className="text-[11px] text-muted-foreground tabular-nums">updated {fmtRelative(raw?.last_update)}</div>
+      </div>
+    </section>
+  );
+}
+
+// ============= Quick actions =============
+
+function QuickActions() {
+  const restart = useRestartService();
+  const scan = useRunScan();
+  const backup = useCreateBackup();
+  const actions: { label: string; icon: any; onClick?: () => void; href?: string; loading?: boolean }[] = [
+    { label: "Restart latest", icon: RotateCw, onClick: () => API_CONFIGURED && restart.mutate(""), loading: restart.isPending },
+    { label: "Run scan", icon: ScanLine, onClick: () => API_CONFIGURED && scan.mutate(), loading: scan.isPending },
+    { label: "Create backup", icon: Database, onClick: () => API_CONFIGURED && backup.mutate(), loading: backup.isPending },
+    { label: "Prometheus", icon: ExternalLink, href: "http://prometheus.local" },
+    { label: "Grafana", icon: ExternalLink, href: "http://grafana.local" },
+    { label: "Portainer", icon: ExternalLink, href: "http://portainer.local" },
+  ];
+  return (
+    <section className="surface-card p-4">
+      <div className="mb-3 flex items-center gap-2">
+        <Lightbulb className="h-4 w-4 text-primary" />
+        <h3 className="text-sm font-semibold">Quick actions</h3>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+        {actions.map((a) => {
+          const Icon = a.icon;
+          const cls = "inline-flex items-center justify-center gap-1.5 rounded-md border border-border bg-background/40 px-3 py-2 text-xs hover:bg-accent transition-colors disabled:opacity-50";
+          if (a.href) {
+            return (
+              <a key={a.label} href={a.href} target="_blank" rel="noreferrer" className={cls}>
+                <Icon className="h-3.5 w-3.5" /> {a.label}
+              </a>
+            );
+          }
+          return (
+            <button key={a.label} onClick={a.onClick} disabled={a.loading} className={cls}>
+              <Icon className={`h-3.5 w-3.5 ${a.loading ? "animate-spin" : ""}`} /> {a.label}
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ============= Active alerts =============
+
+function ActiveAlerts() {
+  const navigate = useNavigate();
+  const { alerts, isLoading, error, refetch } = useAlerts();
+  return (
+    <section className="surface-card p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Bell className="h-4 w-4 text-warning" />
+          <h3 className="text-sm font-semibold">Active alerts</h3>
+          {alerts.length > 0 && (
+            <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-medium text-warning ring-1 ring-warning/30">
+              {alerts.length} firing
+            </span>
+          )}
+        </div>
+      </div>
+      {isLoading && alerts.length === 0 ? (
+        <SkeletonRows n={3} />
+      ) : error ? (
+        <ErrorCard message="Couldn't load alerts" onRetry={() => refetch()} />
+      ) : alerts.length === 0 ? (
+        <EmptyState label="No active alerts — Guardian is calm." />
+      ) : (
+        <ul className="space-y-2">
+          {alerts.map((a, i) => {
+            const sev = a.severity ?? "warning";
+            const sevClass =
+              sev === "critical" ? "bg-destructive/15 text-destructive ring-destructive/30" :
+              sev === "warning" ? "bg-warning/15 text-warning ring-warning/30" :
+              "bg-primary/15 text-primary ring-primary/30";
+            return (
+              <li key={a.id ?? i} className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-md border border-border bg-background/40 px-3 py-2.5">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1 ${sevClass}`}>{sev}</span>
+                    <span className="text-sm font-medium truncate">{a.service ?? "—"}</span>
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground truncate">{a.message}</div>
+                  <div className="mt-0.5 text-[11px] text-muted-foreground tabular-nums">
+                    {a.started ? `Started ${fmtRelative(a.started)}` : ""}{a.duration ? ` · ${a.duration}` : ""}
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate({ to: "/incidents" })}
+                  className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent"
+                >
+                  View incident <ArrowRight className="h-3 w-3" />
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ============= Shared state UI =============
+
+function SkeletonRows({ n = 3 }: { n?: number }) {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: n }).map((_, i) => (
+        <div key={i} className="h-12 animate-pulse rounded-md border border-border bg-background/40" />
+      ))}
+    </div>
+  );
+}
+
+function ErrorCard({ message, onRetry }: { message: string; onRetry?: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-xs text-destructive">
+      <div className="flex items-center gap-2">
+        <AlertCircle className="h-4 w-4" />
+        <span>{message}</span>
+      </div>
+      {onRetry && (
+        <button onClick={onRetry} className="inline-flex items-center gap-1 rounded border border-destructive/30 bg-background/40 px-2 py-1 hover:bg-accent">
+          <RefreshCw className="h-3 w-3" /> Retry
+        </button>
+      )}
+    </div>
+  );
+}
+
+function EmptyState({ label }: { label: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2 rounded-md border border-border bg-background/40 px-3 py-8 text-center text-xs text-muted-foreground">
+      <Inbox className="h-6 w-6 opacity-60" />
+      {label}
+    </div>
+  );
+}
+
 
