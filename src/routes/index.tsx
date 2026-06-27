@@ -102,16 +102,27 @@ function PageHeader() {
 
 function GuardianHero() {
   const [secondsAgo, setSecondsAgo] = useState(12);
-  const { summary, recommendation, isLive } = useAiSummary();
+  const { summary, recommendation, healthyServices, recoveredToday, incidentsOpen, isLive } = useAiSummary();
+  const { healthScore, healthyServices: monHealthy, downServices } = useMonitoring();
   useEffect(() => {
     const id = setInterval(() => setSecondsAgo((s) => (s >= 59 ? 1 : s + 1)), 1000);
     return () => clearInterval(id);
   }, []);
 
   const recoText = recommendation ?? "Increase n8n memory limit to 768MB — peaked at 812MB / 1GB twice today.";
-  const summaryItems = summary
-    ? [summary]
-    : ["42 services healthy", "2 incidents auto-recovered today", "No critical alerts"];
+  const healthy = healthyServices ?? monHealthy;
+  const opens = incidentsOpen ?? downServices;
+
+  const summaryItems: string[] = [];
+  if (summary) summaryItems.push(summary);
+  if (typeof healthy === "number") summaryItems.push(`${healthy} services healthy`);
+  if (typeof recoveredToday === "number") summaryItems.push(`${recoveredToday} incidents auto-recovered today`);
+  if (typeof opens === "number") summaryItems.push(opens === 0 ? "No critical alerts" : `${opens} active incident${opens === 1 ? "" : "s"}`);
+  if (summaryItems.length === 0) {
+    summaryItems.push("42 services healthy", "2 incidents auto-recovered today", "No critical alerts");
+  }
+
+  const ringValue = typeof healthScore === "number" ? healthScore : 98;
 
   return (
     <motion.section
@@ -125,7 +136,7 @@ function GuardianHero() {
 
       <div className="relative grid items-center gap-6 md:grid-cols-[auto_1fr_auto]">
         <div className="flex flex-col items-center gap-2">
-          <HealthRing value={98} />
+          <HealthRing value={ringValue} />
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Clock className="h-3 w-3" />
             Last analysis · <span className="tabular-nums">{secondsAgo}s ago</span>
