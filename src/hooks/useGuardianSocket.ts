@@ -149,6 +149,24 @@ export function useGuardianSocket(): SocketState {
               qc.invalidateQueries({ queryKey: ["notifications"] });
             }
             break;
+          case "alert":
+            if (payload && Array.isArray(payload)) {
+              qc.setQueryData(["alerts"], payload);
+            } else if (payload) {
+              qc.setQueryData<any[]>(["alerts"], (prev) =>
+                prev ? [payload, ...prev].slice(0, 50) : [payload]
+              );
+            } else {
+              qc.invalidateQueries({ queryKey: ["alerts"] });
+            }
+            break;
+          case "health":
+            if (payload && typeof payload === "object") {
+              qc.setQueryData(["monitoring"], (prev: any) => ({ ...(prev ?? {}), ...payload }));
+            } else {
+              qc.invalidateQueries({ queryKey: ["monitoring"] });
+            }
+            break;
           case "ai":
           case "ai_summary":
             if (payload) qc.setQueryData(["ai-summary"], payload);
@@ -157,6 +175,7 @@ export function useGuardianSocket(): SocketState {
           default:
             break;
         }
+
       };
 
       ws.onerror = () => setStatus("error");
