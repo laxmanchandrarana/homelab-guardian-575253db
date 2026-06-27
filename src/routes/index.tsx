@@ -240,8 +240,9 @@ function MetricGrid() {
   );
 }
 
-function ChartsCard({ range, setRange }: { range: string; setRange: (r: any) => void }) {
-  const { series, isLive } = useMetrics();
+function ChartsCard({ range, setRange }: { range: (typeof ranges)[number]; setRange: (r: (typeof ranges)[number]) => void }) {
+  const { series, isLive, isLoading, error, refetch } = useMetrics(range);
+
   const charts = [
     { key: "cpu", label: "CPU", color: "var(--color-chart-1)", unit: "%", data: series.cpu },
     { key: "ram", label: "RAM", color: "var(--color-chart-2)", unit: "%", data: series.ram },
