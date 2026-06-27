@@ -687,17 +687,18 @@ function SystemStatusHeader() {
 // ============= Quick actions =============
 
 function QuickActions() {
-  const restart = useRestartService();
+  const navigate = useNavigate();
   const scan = useRunScan();
   const backup = useCreateBackup();
   const actions: { label: string; icon: any; onClick?: () => void; href?: string; loading?: boolean }[] = [
-    { label: "Restart latest", icon: RotateCw, onClick: () => API_CONFIGURED && restart.mutate(""), loading: restart.isPending },
+    { label: "Restart service", icon: RotateCw, onClick: () => navigate({ to: "/services" }) },
     { label: "Run scan", icon: ScanLine, onClick: () => API_CONFIGURED && scan.mutate(), loading: scan.isPending },
     { label: "Create backup", icon: Database, onClick: () => API_CONFIGURED && backup.mutate(), loading: backup.isPending },
     { label: "Prometheus", icon: ExternalLink, href: "http://prometheus.local" },
     { label: "Grafana", icon: ExternalLink, href: "http://grafana.local" },
     { label: "Portainer", icon: ExternalLink, href: "http://portainer.local" },
   ];
+
   return (
     <section className="surface-card p-4">
       <div className="mb-3 flex items-center gap-2">
