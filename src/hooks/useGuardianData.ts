@@ -189,7 +189,16 @@ export function useAiSummary() {
     refetchInterval: 60_000,
     retry: 1,
   });
-  return { summary: q.data?.summary, recommendation: q.data?.recommendation, isLive: !!q.data, isLoading: q.isLoading };
+  const d = q.data;
+  return {
+    summary: d?.summary,
+    recommendation: d?.recommendation,
+    healthyServices: d?.healthy_services,
+    recoveredToday: d?.recovered_today,
+    incidentsOpen: d?.incidents_open,
+    isLive: !!d,
+    isLoading: q.isLoading,
+  };
 }
 
 export type { MonitoringDTO };
