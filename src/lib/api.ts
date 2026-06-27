@@ -162,6 +162,7 @@ export const endpoints = {
   stopService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/stop`, { method: "POST" }),
   restartServiceDirect: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/restart`, { method: "POST" }),
   incidents: () => api<IncidentDTO[]>("/incidents"),
+  incidentDetail: (id: string | number) => api<IncidentDTO & Record<string, unknown>>(`/incidents/${encodeURIComponent(String(id))}`),
   metrics: (range?: RangeKey) => api<MetricsDTO>(`/metrics${range ? `?range=${range}` : ""}`),
   notifications: () => api<NotificationDTO[]>("/notifications"),
   alerts: () => api<AlertDTO[]>("/alerts"),
