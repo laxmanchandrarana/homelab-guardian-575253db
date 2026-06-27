@@ -1,18 +1,26 @@
-import { Bell, Moon, Search, Settings, Shield } from "lucide-react";
+import { Bell, Moon, RefreshCw, Search, Settings, Shield } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useGuardianSocket } from "@/hooks/useGuardianSocket";
 import { API_CONFIGURED } from "@/lib/api";
 
 export function TopBar() {
-  // Initialize as null to avoid SSR/CSR hydration mismatch on the clock.
   const [time, setTime] = useState<Date | null>(null);
   useEffect(() => {
     setTime(new Date());
     const id = setInterval(() => setTime(new Date()), 1000);
     return () => clearInterval(id);
   }, []);
-  const { status } = useGuardianSocket();
-  const connected = status === "open";
+
+  const { status, label, message, retryIn, reconnect } = useGuardianSocket();
+  const tone =
+    status === "open"
+      ? "text-success"
+      : !API_CONFIGURED
+        ? "text-muted-foreground"
+        : status === "error" || status === "closed"
+          ? "text-destructive"
+          : "text-warning";
+  const showRetry = API_CONFIGURED && (status === "reconnecting" || status === "error" || status === "closed");
 
   return (
     <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur-md md:px-6">
@@ -33,11 +41,24 @@ export function TopBar() {
       </div>
 
       <div className="ml-auto flex items-center gap-1 sm:ml-3 sm:gap-2">
-        <div className="hidden md:flex items-center gap-2 rounded-md bg-card px-2.5 py-1.5 text-xs">
-          <span className={`status-dot ${connected ? "text-success" : API_CONFIGURED ? "text-warning" : "text-muted-foreground"}`} />
+        <div
+          className="hidden md:flex items-center gap-2 rounded-md bg-card px-2.5 py-1.5 text-xs"
+          title={message}
+        >
+          <span className={`status-dot ${tone}`} />
           <span className="text-muted-foreground">
-            {API_CONFIGURED ? (connected ? "Connected" : "Reconnecting…") : "Offline (demo)"}
+            {API_CONFIGURED ? label : "Offline (demo)"}
           </span>
+          {showRetry && (
+            <button
+              onClick={reconnect}
+              aria-label="Reconnect now"
+              title="Reconnect now"
+              className="ml-1 grid h-5 w-5 place-items-center rounded text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <RefreshCw className={`h-3 w-3 ${retryIn > 0 ? "animate-spin" : ""}`} />
+            </button>
+          )}
         </div>
         <div className="hidden lg:block text-xs tabular-nums text-muted-foreground" suppressHydrationWarning>
           {time ? time.toLocaleTimeString() : ""}
@@ -55,6 +76,7 @@ export function TopBar() {
     </header>
   );
 }
+
 
 function IconBtn({ children, label }: { children: React.ReactNode; label: string }) {
   return (
