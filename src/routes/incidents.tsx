@@ -619,7 +619,7 @@ function DetailDrawer({
     ? (d.events as { time: string; text: string }[])
     : [];
 
-  const relatedNotifs = notifications.filter((n) =>
+  const relatedNotifs = (notifications as unknown as NotifRow[]).filter((n) =>
     incident.service ? (n.text ?? "").toLowerCase().includes(incident.service.toLowerCase()) : true,
   );
 
