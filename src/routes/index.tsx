@@ -270,7 +270,10 @@ function ChartsCard({ range, setRange }: { range: (typeof ranges)[number]; setRa
           ))}
         </div>
       </div>
+      {error && !isLive && <div className="mb-3"><ErrorCard message="Couldn't load metrics" onRetry={() => refetch()} /></div>}
+      {isLoading && !isLive && <div className="mb-3"><SkeletonRows n={2} /></div>}
       <div className="grid gap-4 sm:grid-cols-2">
+
         {charts.map((c) => {
           const current = c.data[c.data.length - 1].v;
           const peak = Math.max(...c.data.map((d) => d.v));
