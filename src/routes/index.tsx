@@ -237,13 +237,6 @@ function ChartsCard({ range, setRange }: { range: string; setRange: (r: any) => 
           {isLive && <span className="rounded-full bg-success/15 px-1.5 py-0.5 text-[9px] font-medium text-success ring-1 ring-success/30">LIVE</span>}
         </div>
 
-  return (
-    <section className="surface-card p-5">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <Activity className="h-4 w-4 text-primary" />
-          <h3 className="text-sm font-semibold">Live resource metrics</h3>
-        </div>
         <div className="flex rounded-md border border-border bg-card p-0.5 text-xs">
           {ranges.map((r) => (
             <button
