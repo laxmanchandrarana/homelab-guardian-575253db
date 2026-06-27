@@ -6,14 +6,18 @@ import {
   type IncidentDTO,
   type MonitoringDTO,
   type NotificationDTO,
+  type MetricsDTO,
+  type MetricPoint,
 } from "@/lib/api";
 import {
   topMetrics as mockTopMetrics,
   services as mockServices,
   liveEvents as mockEvents,
   incidentTimeline as mockTimeline,
+  genSeries,
   type Status,
 } from "@/lib/mock-data";
+
 
 function normalizeStatus(s: string | undefined): Status {
   const v = (s ?? "").toLowerCase();
