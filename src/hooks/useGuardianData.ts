@@ -104,6 +104,7 @@ export function useServices() {
         ram: fmtRam(s.memory),
         uptime: s.uptime ?? "—",
         autoHeal: s.autoHeal ?? s.autoheal ?? false,
+        lastRestart: s.lastRestart ?? s.last_restart,
       }))
     : mockServices;
 
