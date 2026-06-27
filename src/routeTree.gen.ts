@@ -17,6 +17,7 @@ import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as IncidentsRouteImport } from './routes/incidents'
 import { Route as AiRouteImport } from './routes/ai'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ServicesServiceRouteImport } from './routes/services.$service'
 
 const TopologyRoute = TopologyRouteImport.update({
   id: '/topology',
@@ -58,6 +59,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ServicesServiceRoute = ServicesServiceRouteImport.update({
+  id: '/$service',
+  path: '/$service',
+  getParentRoute: () => ServicesRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -65,9 +71,10 @@ export interface FileRoutesByFullPath {
   '/incidents': typeof IncidentsRoute
   '/monitoring': typeof MonitoringRoute
   '/notifications': typeof NotificationsRoute
-  '/services': typeof ServicesRoute
+  '/services': typeof ServicesRouteWithChildren
   '/settings': typeof SettingsRoute
   '/topology': typeof TopologyRoute
+  '/services/$service': typeof ServicesServiceRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -75,9 +82,10 @@ export interface FileRoutesByTo {
   '/incidents': typeof IncidentsRoute
   '/monitoring': typeof MonitoringRoute
   '/notifications': typeof NotificationsRoute
-  '/services': typeof ServicesRoute
+  '/services': typeof ServicesRouteWithChildren
   '/settings': typeof SettingsRoute
   '/topology': typeof TopologyRoute
+  '/services/$service': typeof ServicesServiceRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -86,9 +94,10 @@ export interface FileRoutesById {
   '/incidents': typeof IncidentsRoute
   '/monitoring': typeof MonitoringRoute
   '/notifications': typeof NotificationsRoute
-  '/services': typeof ServicesRoute
+  '/services': typeof ServicesRouteWithChildren
   '/settings': typeof SettingsRoute
   '/topology': typeof TopologyRoute
+  '/services/$service': typeof ServicesServiceRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -101,6 +110,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/settings'
     | '/topology'
+    | '/services/$service'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -111,6 +121,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/settings'
     | '/topology'
+    | '/services/$service'
   id:
     | '__root__'
     | '/'
@@ -121,6 +132,7 @@ export interface FileRouteTypes {
     | '/services'
     | '/settings'
     | '/topology'
+    | '/services/$service'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -129,7 +141,7 @@ export interface RootRouteChildren {
   IncidentsRoute: typeof IncidentsRoute
   MonitoringRoute: typeof MonitoringRoute
   NotificationsRoute: typeof NotificationsRoute
-  ServicesRoute: typeof ServicesRoute
+  ServicesRoute: typeof ServicesRouteWithChildren
   SettingsRoute: typeof SettingsRoute
   TopologyRoute: typeof TopologyRoute
 }
@@ -192,8 +204,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/services/$service': {
+      id: '/services/$service'
+      path: '/$service'
+      fullPath: '/services/$service'
+      preLoaderRoute: typeof ServicesServiceRouteImport
+      parentRoute: typeof ServicesRoute
+    }
   }
 }
+
+interface ServicesRouteChildren {
+  ServicesServiceRoute: typeof ServicesServiceRoute
+}
+
+const ServicesRouteChildren: ServicesRouteChildren = {
+  ServicesServiceRoute: ServicesServiceRoute,
+}
+
+const ServicesRouteWithChildren = ServicesRoute._addFileChildren(
+  ServicesRouteChildren,
+)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -201,20 +232,10 @@ const rootRouteChildren: RootRouteChildren = {
   IncidentsRoute: IncidentsRoute,
   MonitoringRoute: MonitoringRoute,
   NotificationsRoute: NotificationsRoute,
-  ServicesRoute: ServicesRoute,
+  ServicesRoute: ServicesRouteWithChildren,
   SettingsRoute: SettingsRoute,
   TopologyRoute: TopologyRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
