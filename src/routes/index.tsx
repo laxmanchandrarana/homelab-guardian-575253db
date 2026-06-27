@@ -385,11 +385,21 @@ function ServicesPreview() {
   const qc = useQueryClient();
   const restart = useMutation({
     mutationFn: (name: string) => endpoints.restartService(name),
-    onSuccess: () => {
+    onMutate: async (name: string) => {
+      await qc.cancelQueries({ queryKey: ["services"] });
+      const prev = qc.getQueryData<any[]>(["services"]);
+      if (prev) {
+        qc.setQueryData<any[]>(["services"], prev.map((s) => s.name === name ? { ...s, status: "restarting" } : s));
+      }
+      return { prev };
+    },
+    onError: (_e, _n, ctx) => { if (ctx?.prev) qc.setQueryData(["services"], ctx.prev); },
+    onSettled: () => {
       qc.invalidateQueries({ queryKey: ["services"] });
       qc.invalidateQueries({ queryKey: ["incidents"] });
     },
   });
+
   return (
     <section className="surface-card p-5">
       <div className="mb-4 flex items-center justify-between">
