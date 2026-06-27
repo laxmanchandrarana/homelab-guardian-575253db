@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { wsUrl, API_CONFIGURED } from "@/lib/api";
 
 export type GuardianEvent = {
-  type: string; // "incident" | "metric" | "notification" | "service" | ...
+  type: string;
   service?: string;
   level?: "info" | "warning" | "danger" | "healthy";
   text?: string;
@@ -11,29 +11,79 @@ export type GuardianEvent = {
   payload?: unknown;
 };
 
-type SocketStatus = "idle" | "connecting" | "open" | "closed" | "error";
+export type SocketStatus = "idle" | "connecting" | "open" | "closed" | "error" | "reconnecting";
 
-/**
- * Connects to the Guardian backend WebSocket and invalidates React Query
- * caches when relevant events arrive. Auto-reconnects with backoff.
- * Returns the latest event and connection status.
- */
-export function useGuardianSocket() {
+export type SocketState = {
+  status: SocketStatus;
+  /** Short, user-friendly label e.g. "Connected", "Reconnecting in 4s…" */
+  label: string;
+  /** Longer human-readable description of what's happening */
+  message: string;
+  /** Seconds remaining until next reconnect attempt (0 when not waiting) */
+  retryIn: number;
+  /** How many reconnect attempts have been made */
+  attempt: number;
+  lastEvent: GuardianEvent | null;
+  /** Manually trigger a reconnect now */
+  reconnect: () => void;
+};
+
+const FRIENDLY: Record<SocketStatus, { label: string; message: string }> = {
+  idle: { label: "Idle", message: "Live updates haven't started yet." },
+  connecting: { label: "Connecting…", message: "Opening live connection to Guardian." },
+  open: { label: "Live", message: "Connected — receiving real-time updates." },
+  reconnecting: { label: "Reconnecting…", message: "Connection dropped. Trying to reach Guardian again." },
+  closed: { label: "Disconnected", message: "Live updates are paused. We'll keep retrying." },
+  error: { label: "Connection error", message: "Couldn't reach Guardian. Check that the API is online." },
+};
+
+export function useGuardianSocket(): SocketState {
   const [status, setStatus] = useState<SocketStatus>("idle");
+  const [retryIn, setRetryIn] = useState(0);
+  const [attempt, setAttempt] = useState(0);
   const [lastEvent, setLastEvent] = useState<GuardianEvent | null>(null);
+
   const qc = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
   const retryRef = useRef(0);
   const stoppedRef = useRef(false);
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const connectRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     if (typeof window === "undefined" || !API_CONFIGURED) return;
     const url = wsUrl("/ws");
     if (!url) return;
 
-    let timer: ReturnType<typeof setTimeout> | null = null;
+    const clearTimers = () => {
+      if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+      if (countdownTimerRef.current) clearInterval(countdownTimerRef.current);
+      reconnectTimerRef.current = null;
+      countdownTimerRef.current = null;
+    };
+
+    const scheduleReconnect = () => {
+      const a = retryRef.current++;
+      setAttempt(a + 1);
+      const delaySec = Math.min(2 ** Math.min(a, 5), 30); // 1,2,4,8,16,32→30
+      setRetryIn(delaySec);
+      setStatus("reconnecting");
+
+      countdownTimerRef.current = setInterval(() => {
+        setRetryIn((s) => (s > 0 ? s - 1 : 0));
+      }, 1000);
+
+      reconnectTimerRef.current = setTimeout(() => {
+        clearTimers();
+        setRetryIn(0);
+        connectRef.current();
+      }, delaySec * 1000);
+    };
 
     const connect = () => {
+      clearTimers();
+      setRetryIn(0);
       setStatus("connecting");
       let ws: WebSocket;
       try {
@@ -47,6 +97,7 @@ export function useGuardianSocket() {
 
       ws.onopen = () => {
         retryRef.current = 0;
+        setAttempt(0);
         setStatus("open");
       };
 
@@ -58,7 +109,6 @@ export function useGuardianSocket() {
           return;
         }
         setLastEvent(data);
-        // Invalidate the relevant queries so they refetch
         switch (data.type) {
           case "incident":
             qc.invalidateQueries({ queryKey: ["incidents"] });
@@ -81,24 +131,35 @@ export function useGuardianSocket() {
 
       ws.onerror = () => setStatus("error");
       ws.onclose = () => {
+        if (stoppedRef.current) return;
         setStatus("closed");
-        if (!stoppedRef.current) scheduleReconnect();
+        scheduleReconnect();
       };
     };
 
-    const scheduleReconnect = () => {
-      const attempt = Math.min(retryRef.current++, 6);
-      const delay = Math.min(1000 * 2 ** attempt, 30000);
-      timer = setTimeout(connect, delay);
-    };
-
+    connectRef.current = connect;
     connect();
+
     return () => {
       stoppedRef.current = true;
-      if (timer) clearTimeout(timer);
+      clearTimers();
       wsRef.current?.close();
     };
   }, [qc]);
 
-  return { status, lastEvent };
+  const base = FRIENDLY[status];
+  const label =
+    status === "reconnecting" && retryIn > 0 ? `Reconnecting in ${retryIn}s…` : base.label;
+  const message =
+    status === "reconnecting" && retryIn > 0
+      ? `Lost connection to Guardian. Retrying in ${retryIn}s (attempt ${attempt}).`
+      : base.message;
+
+  const reconnect = () => {
+    retryRef.current = 0;
+    setAttempt(0);
+    connectRef.current?.();
+  };
+
+  return { status, label, message, retryIn, attempt, lastEvent, reconnect };
 }
