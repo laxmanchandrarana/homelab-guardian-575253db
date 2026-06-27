@@ -64,8 +64,24 @@ export const Route = createFileRoute("/incidents")({
 type Severity = "critical" | "warning" | "resolved" | "info";
 type StatusKey = "open" | "investigating" | "resolved";
 
-type TimelineRow = ReturnType<typeof useIncidents>["timeline"][number] & {
+type TimelineRow = {
+  id?: string | number;
   rawId?: string | number;
+  time: string;
+  service: string;
+  text: string;
+  status: string;
+  detail?: string;
+  action?: string;
+  severity?: string;
+};
+
+type NotifRow = {
+  time: string;
+  text: string;
+  status: string;
+  channel?: string;
+  deliveryStatus?: string;
 };
 
 const SEVERITY_LABEL: Record<Severity, string> = {
