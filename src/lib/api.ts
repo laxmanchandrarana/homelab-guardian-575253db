@@ -2,7 +2,9 @@
 // Set VITE_API_URL in your environment (e.g. http://100.93.15.3:8008).
 // When VITE_API_URL is unset, callers should fall back to mock data.
 
-export const API_URL: string = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "";
+const DEFAULT_API_URL = "https://api-guardian.atmakriti.com";
+export const API_URL: string =
+  ((import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "") || DEFAULT_API_URL;
 
 export const API_CONFIGURED = API_URL.length > 0;
 
