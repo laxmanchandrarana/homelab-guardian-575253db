@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Boxes,
@@ -192,6 +192,7 @@ function ServicesPage() {
     return out;
   }, [rows, q, statusFilter, healthFilter, sort]);
 
+  const navigate = useNavigate();
   // Selection for bulk actions
   const [selected, setSelected] = useState<Set<string>>(new Set());
   function toggleSelect(name: string) {
@@ -366,7 +367,7 @@ function ServicesPage() {
                 s={s}
                 selected={selected.has(s.name)}
                 onSelect={() => toggleSelect(s.name)}
-                onOpen={() => setOpenName(s.name)}
+                onOpen={() => navigate({ to: "/services/$service", params: { service: s.name } })}
                 onAction={(a) => ask(a, s.name)}
               />
             ))}
