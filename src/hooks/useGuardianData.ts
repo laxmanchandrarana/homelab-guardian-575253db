@@ -129,4 +129,43 @@ export function useNotifications() {
   return { events, isLoading: q.isLoading, isLive: !!q.data, error: q.error };
 }
 
+// ---------- Metrics → live charts ----------
+function toSeries(points: MetricPoint[] | undefined, fallback: { t: number; v: number }[]) {
+  if (!points || points.length === 0) return fallback;
+  return points.slice(-48).map((p, i) => ({ t: i, v: Math.max(0, Math.min(100, Number(p.v) || 0)) }));
+}
+
+export function useMetrics() {
+  const q = useQuery({
+    queryKey: ["metrics"],
+    queryFn: endpoints.metrics,
+    enabled: API_CONFIGURED,
+    refetchInterval: 5000,
+    retry: 1,
+  });
+
+  const d = q.data;
+  const series = {
+    cpu: toSeries(d?.cpu, genSeries(48, 21, 12)),
+    ram: toSeries(d?.memory, genSeries(48, 53, 8)),
+    disk: toSeries(d?.disk, genSeries(48, 34, 22)),
+    net: toSeries(d?.network, genSeries(48, 40, 26)),
+  };
+
+  return { series, isLoading: q.isLoading, isLive: !!d, error: q.error };
+}
+
+// ---------- AI summary ----------
+export function useAiSummary() {
+  const q = useQuery({
+    queryKey: ["ai-summary"],
+    queryFn: endpoints.aiSummary,
+    enabled: API_CONFIGURED,
+    refetchInterval: 60_000,
+    retry: 1,
+  });
+  return { summary: q.data?.summary, recommendation: q.data?.recommendation, isLive: !!q.data, isLoading: q.isLoading };
+}
+
 export type { MonitoringDTO };
+
