@@ -1,20 +1,25 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
   Cpu, Brain, RotateCw, FileText, BarChart3, ChevronRight,
   ShieldCheck, Activity, Lightbulb, Clock, CheckCircle2, AlertTriangle, ArrowRight,
+  Bell, ExternalLink, ScanLine, Database, Send, MessageCircle, Hash, Mail,
+  AlertCircle, RefreshCw, Inbox,
 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
 import { Sparkline } from "@/components/Sparkline";
 import { HealthRing } from "@/components/HealthRing";
-import { topMetrics as mockTopMetrics, liveEvents as fallbackEvents, infraNodes, guardianInsights, genSeries, type Status } from "@/lib/mock-data";
-import { useMonitoring, useServices, useIncidents, useNotifications, useMetrics, useAiSummary } from "@/hooks/useGuardianData";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { endpoints, API_CONFIGURED } from "@/lib/api";
+import { topMetrics as mockTopMetrics, liveEvents as fallbackEvents, infraNodes, guardianInsights, type Status } from "@/lib/mock-data";
+import {
+  useMonitoring, useServices, useIncidents, useNotifications, useMetrics, useAiSummary,
+  useAlerts, useRestartService, useRunScan, useCreateBackup,
+} from "@/hooks/useGuardianData";
+import { API_CONFIGURED } from "@/lib/api";
 import * as Icons from "lucide-react";
 import { useEffect, useState } from "react";
+
 
 export const Route = createFileRoute("/")({
   head: () => ({
