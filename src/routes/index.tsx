@@ -466,6 +466,9 @@ function ServicesPreview() {
               <div><div className="text-base font-medium text-foreground tabular-nums">{s.ram}</div>RAM</div>
               <div><div className="text-base font-medium text-foreground tabular-nums">{s.uptime}</div>Uptime</div>
             </div>
+            {(s as any).lastRestart && (
+              <div className="mt-2 text-[10px] text-muted-foreground">Last restart · {(s as any).lastRestart}</div>
+            )}
             <div className="mt-3 flex gap-1.5">
               <button
                 onClick={() => API_CONFIGURED && restart.mutate(s.name)}
