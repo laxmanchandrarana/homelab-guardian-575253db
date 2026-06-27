@@ -32,10 +32,12 @@ export async function api<T = unknown>(path: string, options: RequestInit = {}):
   if (!res.ok) {
     throw new ApiError(res.status, await res.text().catch(() => ""));
   }
-  // Some POST endpoints may return empty body
   const text = await res.text();
   return (text ? JSON.parse(text) : (undefined as unknown)) as T;
 }
+
+export type RangeKey = "15m" | "1h" | "6h" | "24h";
+
 
 // Derive WS URL from API_URL (http -> ws, https -> wss).
 export function wsUrl(path = "/ws"): string | null {
