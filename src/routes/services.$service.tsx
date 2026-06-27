@@ -67,14 +67,14 @@ export const Route = createFileRoute("/services/$service")({
   head: () => ({ meta: [{ title: "Service — Homelab Guardian" }] }),
   component: ServiceDetailPage,
   errorComponent: ({ error }) => (
-    <AppShell title="Service">
+    <AppShell>
       <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-6 text-sm">
         {error.message}
       </div>
     </AppShell>
   ),
   notFoundComponent: () => (
-    <AppShell title="Service">
+    <AppShell>
       <div className="rounded-xl border border-border/60 bg-card/40 p-6 text-sm">
         Service not found.
       </div>
@@ -292,7 +292,7 @@ function ServiceDetailPage() {
   };
 
   return (
-    <AppShell title="Service">
+    <AppShell>
       <div className="space-y-5">
         {/* Back */}
         <button
