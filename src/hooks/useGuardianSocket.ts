@@ -109,20 +109,50 @@ export function useGuardianSocket(): SocketState {
           return;
         }
         setLastEvent(data);
+        const payload = data.payload as any;
         switch (data.type) {
           case "incident":
-            qc.invalidateQueries({ queryKey: ["incidents"] });
+            if (payload && Array.isArray(payload)) {
+              qc.setQueryData(["incidents"], payload);
+            } else if (payload) {
+              qc.setQueryData<any[]>(["incidents"], (prev) =>
+                prev ? [payload, ...prev].slice(0, 50) : [payload]
+              );
+            } else {
+              qc.invalidateQueries({ queryKey: ["incidents"] });
+            }
             qc.invalidateQueries({ queryKey: ["services"] });
             break;
           case "service":
-            qc.invalidateQueries({ queryKey: ["services"] });
+            if (payload?.name) {
+              qc.setQueryData<any[]>(["services"], (prev) =>
+                prev ? prev.map((s) => (s.name === payload.name ? { ...s, ...payload } : s)) : prev
+              );
+            } else {
+              qc.invalidateQueries({ queryKey: ["services"] });
+            }
             break;
           case "metric":
-            qc.invalidateQueries({ queryKey: ["monitoring"] });
+            if (payload && typeof payload === "object") {
+              qc.setQueryData(["monitoring"], (prev: any) => ({ ...(prev ?? {}), ...payload }));
+            } else {
+              qc.invalidateQueries({ queryKey: ["monitoring"] });
+            }
             qc.invalidateQueries({ queryKey: ["metrics"] });
             break;
           case "notification":
-            qc.invalidateQueries({ queryKey: ["notifications"] });
+            if (payload) {
+              qc.setQueryData<any[]>(["notifications"], (prev) =>
+                prev ? [payload, ...prev].slice(0, 50) : [payload]
+              );
+            } else {
+              qc.invalidateQueries({ queryKey: ["notifications"] });
+            }
+            break;
+          case "ai":
+          case "ai_summary":
+            if (payload) qc.setQueryData(["ai-summary"], payload);
+            else qc.invalidateQueries({ queryKey: ["ai-summary"] });
             break;
           default:
             break;
