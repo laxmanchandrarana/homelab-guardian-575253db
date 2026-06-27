@@ -369,22 +369,32 @@ function IncidentTimeline() {
       ) : (
         <ol className="relative ml-2">
           <span className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
-          {timeline.map((step, i) => (
-            <motion.li
-              key={i}
-              initial={{ opacity: 0, x: 8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.08 }}
-              className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
-            >
-              <span className={`mt-1.5 status-dot ${statusColor[step.status]} z-10`} />
-              <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
-              <div>
-                <div className="text-sm font-medium">{step.text}</div>
-                <div className="text-xs text-muted-foreground">{step.detail}</div>
-              </div>
-            </motion.li>
-          ))}
+          {timeline.map((step: any, i: number) => {
+            const sev = step.severity ?? (step.status === "danger" ? "critical" : step.status === "warning" ? "warning" : "resolved");
+            const sevClass =
+              sev === "critical" ? "bg-destructive/15 text-destructive ring-destructive/30" :
+              sev === "warning" ? "bg-warning/15 text-warning ring-warning/30" :
+              "bg-success/15 text-success ring-success/30";
+            return (
+              <motion.li
+                key={i}
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
+              >
+                <span className={`mt-1.5 status-dot ${statusColor[step.status]} z-10`} />
+                <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-sm font-medium">{step.text}</div>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1 ${sevClass}`}>{sev}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{step.detail}</div>
+                </div>
+              </motion.li>
+            );
+          })}
         </ol>
       )}
     </section>
