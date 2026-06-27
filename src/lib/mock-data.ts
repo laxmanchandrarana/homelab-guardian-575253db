@@ -56,8 +56,16 @@ export const guardianInsights = [
 ];
 
 export function genSeries(points = 40, base = 30, spread = 20) {
+  // Deterministic (SSR-safe): no Math.random, no Date.now.
   return Array.from({ length: points }, (_, i) => ({
     t: i,
-    v: Math.max(0, Math.min(100, base + Math.sin(i / 4) * spread + (Math.random() - 0.5) * 8)),
+    v: Math.max(
+      0,
+      Math.min(
+        100,
+        base + Math.sin(i / 4) * spread + Math.cos(i / 7) * (spread / 3),
+      ),
+    ),
   }));
 }
+
