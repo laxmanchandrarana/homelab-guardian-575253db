@@ -55,11 +55,35 @@ export function useMonitoring() {
             display: typeof live.network === "string" ? live.network : undefined,
             value: typeof live.network === "number" ? live.network : m.value,
           };
+        if (m.id === "services" && typeof live.healthy_services === "number")
+          return { ...m, value: live.healthy_services, display: String(live.healthy_services) };
+        if (m.id === "incidents" && typeof live.down_services === "number")
+          return { ...m, value: live.down_services, display: String(live.down_services) };
         return m;
       })
     : mockTopMetrics;
 
-  return { metrics, isLoading: q.isLoading, isLive: !!live, error: q.error };
+  return {
+    metrics,
+    healthScore: typeof live?.health_score === "number" ? live.health_score : undefined,
+    healthyServices: live?.healthy_services,
+    downServices: live?.down_services,
+    isLoading: q.isLoading,
+    isLive: !!live,
+    error: q.error,
+  };
+}
+
+// ---------- Dashboard summary (optional /dashboard) ----------
+export function useDashboard() {
+  const q = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: endpoints.dashboard,
+    enabled: API_CONFIGURED,
+    refetchInterval: 10000,
+    retry: 0,
+  });
+  return { data: q.data, isLive: !!q.data, isLoading: q.isLoading };
 }
 
 // ---------- Services ----------
@@ -80,6 +104,7 @@ export function useServices() {
         ram: fmtRam(s.memory),
         uptime: s.uptime ?? "—",
         autoHeal: s.autoHeal ?? s.autoheal ?? false,
+        lastRestart: s.lastRestart ?? s.last_restart,
       }))
     : mockServices;
 
@@ -97,13 +122,20 @@ export function useIncidents() {
   });
 
   const timeline = q.data
-    ? q.data.slice(0, 10).map((i: IncidentDTO) => ({
-        time: i.time,
-        text: `${i.service} ${i.status}`,
-        status: normalizeStatus(i.status),
-        detail: i.detail ?? "",
-      }))
-    : mockTimeline;
+    ? q.data.slice(0, 10).map((i: IncidentDTO) => {
+        const status = normalizeStatus(i.status);
+        const severity =
+          i.severity ??
+          (status === "danger" ? "critical" : status === "warning" ? "warning" : "resolved");
+        return {
+          time: i.time,
+          text: `${i.service} ${i.status}`,
+          status,
+          detail: i.detail ?? "",
+          severity,
+        };
+      })
+    : mockTimeline.map((t) => ({ ...t, severity: t.status === "danger" ? "critical" : t.status === "warning" ? "warning" : "resolved" }));
 
   return { timeline, isLoading: q.isLoading, isLive: !!q.data, error: q.error };
 }
@@ -164,7 +196,16 @@ export function useAiSummary() {
     refetchInterval: 60_000,
     retry: 1,
   });
-  return { summary: q.data?.summary, recommendation: q.data?.recommendation, isLive: !!q.data, isLoading: q.isLoading };
+  const d = q.data;
+  return {
+    summary: d?.summary,
+    recommendation: d?.recommendation,
+    healthyServices: d?.healthy_services,
+    recoveredToday: d?.recovered_today,
+    incidentsOpen: d?.incidents_open,
+    isLive: !!d,
+    isLoading: q.isLoading,
+  };
 }
 
 export type { MonitoringDTO };

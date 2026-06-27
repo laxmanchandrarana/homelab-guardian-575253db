@@ -102,16 +102,27 @@ function PageHeader() {
 
 function GuardianHero() {
   const [secondsAgo, setSecondsAgo] = useState(12);
-  const { summary, recommendation, isLive } = useAiSummary();
+  const { summary, recommendation, healthyServices, recoveredToday, incidentsOpen, isLive } = useAiSummary();
+  const { healthScore, healthyServices: monHealthy, downServices } = useMonitoring();
   useEffect(() => {
     const id = setInterval(() => setSecondsAgo((s) => (s >= 59 ? 1 : s + 1)), 1000);
     return () => clearInterval(id);
   }, []);
 
   const recoText = recommendation ?? "Increase n8n memory limit to 768MB — peaked at 812MB / 1GB twice today.";
-  const summaryItems = summary
-    ? [summary]
-    : ["42 services healthy", "2 incidents auto-recovered today", "No critical alerts"];
+  const healthy = healthyServices ?? monHealthy;
+  const opens = incidentsOpen ?? downServices;
+
+  const summaryItems: string[] = [];
+  if (summary) summaryItems.push(summary);
+  if (typeof healthy === "number") summaryItems.push(`${healthy} services healthy`);
+  if (typeof recoveredToday === "number") summaryItems.push(`${recoveredToday} incidents auto-recovered today`);
+  if (typeof opens === "number") summaryItems.push(opens === 0 ? "No critical alerts" : `${opens} active incident${opens === 1 ? "" : "s"}`);
+  if (summaryItems.length === 0) {
+    summaryItems.push("42 services healthy", "2 incidents auto-recovered today", "No critical alerts");
+  }
+
+  const ringValue = typeof healthScore === "number" ? healthScore : 98;
 
   return (
     <motion.section
@@ -125,7 +136,7 @@ function GuardianHero() {
 
       <div className="relative grid items-center gap-6 md:grid-cols-[auto_1fr_auto]">
         <div className="flex flex-col items-center gap-2">
-          <HealthRing value={98} />
+          <HealthRing value={ringValue} />
           <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
             <Clock className="h-3 w-3" />
             Last analysis · <span className="tabular-nums">{secondsAgo}s ago</span>
@@ -358,22 +369,32 @@ function IncidentTimeline() {
       ) : (
         <ol className="relative ml-2">
           <span className="absolute left-[7px] top-2 bottom-2 w-px bg-border" />
-          {timeline.map((step, i) => (
-            <motion.li
-              key={i}
-              initial={{ opacity: 0, x: 8 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: i * 0.08 }}
-              className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
-            >
-              <span className={`mt-1.5 status-dot ${statusColor[step.status]} z-10`} />
-              <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
-              <div>
-                <div className="text-sm font-medium">{step.text}</div>
-                <div className="text-xs text-muted-foreground">{step.detail}</div>
-              </div>
-            </motion.li>
-          ))}
+          {timeline.map((step: any, i: number) => {
+            const sev = step.severity ?? (step.status === "danger" ? "critical" : step.status === "warning" ? "warning" : "resolved");
+            const sevClass =
+              sev === "critical" ? "bg-destructive/15 text-destructive ring-destructive/30" :
+              sev === "warning" ? "bg-warning/15 text-warning ring-warning/30" :
+              "bg-success/15 text-success ring-success/30";
+            return (
+              <motion.li
+                key={i}
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: i * 0.08 }}
+                className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
+              >
+                <span className={`mt-1.5 status-dot ${statusColor[step.status as Status]} z-10`} />
+                <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="text-sm font-medium">{step.text}</div>
+                    <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1 ${sevClass}`}>{sev}</span>
+                  </div>
+                  <div className="text-xs text-muted-foreground">{step.detail}</div>
+                </div>
+              </motion.li>
+            );
+          })}
         </ol>
       )}
     </section>
@@ -445,6 +466,9 @@ function ServicesPreview() {
               <div><div className="text-base font-medium text-foreground tabular-nums">{s.ram}</div>RAM</div>
               <div><div className="text-base font-medium text-foreground tabular-nums">{s.uptime}</div>Uptime</div>
             </div>
+            {(s as any).lastRestart && (
+              <div className="mt-2 text-[10px] text-muted-foreground">Last restart · {(s as any).lastRestart}</div>
+            )}
             <div className="mt-3 flex gap-1.5">
               <button
                 onClick={() => API_CONFIGURED && restart.mutate(s.name)}

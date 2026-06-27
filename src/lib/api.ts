@@ -57,16 +57,27 @@ export type MonitoringDTO = {
   memory: number;
   disk: number;
   network: string | number;
+  health_score?: number;
+  healthy_services?: number;
+  down_services?: number;
+};
+
+export type DashboardDTO = MonitoringDTO & {
+  health_score: number;
+  healthy_services: number;
+  down_services: number;
 };
 
 export type ServiceDTO = {
   name: string;
-  status: string; // "running" | "warning" | "down" | ...
+  status: string;
   cpu: number;
   memory: number | string;
   uptime?: string;
   autoheal?: boolean;
   autoHeal?: boolean;
+  lastRestart?: string;
+  last_restart?: string;
 };
 
 export type IncidentDTO = {
@@ -74,6 +85,7 @@ export type IncidentDTO = {
   status: string;
   time: string;
   detail?: string;
+  severity?: "critical" | "warning" | "resolved" | "info";
 };
 
 export type NotificationDTO = {
@@ -91,13 +103,23 @@ export type MetricsDTO = {
   network?: MetricPoint[];
 };
 
+export type AiSummaryDTO = {
+  summary: string;
+  recommendation?: string;
+  healthy_services?: number;
+  recovered_today?: number;
+  incidents_open?: number;
+};
+
 export const endpoints = {
   monitoring: () => api<MonitoringDTO>("/monitoring"),
+  dashboard: () => api<DashboardDTO>("/dashboard"),
   services: () => api<ServiceDTO[]>("/services"),
   incidents: () => api<IncidentDTO[]>("/incidents"),
   metrics: () => api<MetricsDTO>("/metrics"),
   notifications: () => api<NotificationDTO[]>("/notifications"),
-  aiSummary: () => api<{ summary: string; recommendation?: string }>("/ai/summary"),
+  aiSummary: () => api<AiSummaryDTO>("/ai/summary"),
+  health: () => api<{ status: string }>("/health"),
   restartService: (service: string) =>
     api<{ ok: boolean }>(`/incidents/${encodeURIComponent(service)}`, { method: "POST" }),
 };
