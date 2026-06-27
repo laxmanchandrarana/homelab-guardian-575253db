@@ -366,7 +366,7 @@ function ServicesPage() {
                 s={s}
                 selected={selected.has(s.name)}
                 onSelect={() => toggleSelect(s.name)}
-                onOpen={() => setOpenName(s.name)}
+                onOpen={() => navigate({ to: "/services/$service", params: { service: s.name } })}
                 onAction={(a) => ask(a, s.name)}
               />
             ))}
