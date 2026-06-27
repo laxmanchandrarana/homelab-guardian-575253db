@@ -1,13 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   endpoints,
   API_CONFIGURED,
   type ServiceDTO,
   type IncidentDTO,
-  type MonitoringDTO,
   type NotificationDTO,
+  type AlertDTO,
   type MetricsDTO,
   type MetricPoint,
+  type RangeKey,
 } from "@/lib/api";
 import {
   topMetrics as mockTopMetrics,
@@ -21,8 +22,8 @@ import {
 
 function normalizeStatus(s: string | undefined): Status {
   const v = (s ?? "").toLowerCase();
-  if (["healthy", "running", "ok", "up", "resolved"].includes(v)) return "healthy";
-  if (["warning", "warn", "degraded", "restarting"].includes(v)) return "warning";
+  if (["healthy", "running", "ok", "up", "resolved", "delivered", "success"].includes(v)) return "healthy";
+  if (["warning", "warn", "degraded", "restarting", "pending"].includes(v)) return "warning";
   return "danger";
 }
 
@@ -55,8 +56,8 @@ export function useMonitoring() {
             display: typeof live.network === "string" ? live.network : undefined,
             value: typeof live.network === "number" ? live.network : m.value,
           };
-        if (m.id === "services" && typeof live.healthy_services === "number")
-          return { ...m, value: live.healthy_services, display: String(live.healthy_services) };
+        if (m.id === "containers" && typeof live.containers_total === "number")
+          return { ...m, value: live.containers_total, display: `${live.containers_total} Running` };
         if (m.id === "incidents" && typeof live.down_services === "number")
           return { ...m, value: live.down_services, display: String(live.down_services) };
         return m;
@@ -65,12 +66,14 @@ export function useMonitoring() {
 
   return {
     metrics,
+    raw: live,
     healthScore: typeof live?.health_score === "number" ? live.health_score : undefined,
     healthyServices: live?.healthy_services,
     downServices: live?.down_services,
     isLoading: q.isLoading,
     isLive: !!live,
     error: q.error,
+    refetch: q.refetch,
   };
 }
 
@@ -105,10 +108,12 @@ export function useServices() {
         uptime: s.uptime ?? "—",
         autoHeal: s.autoHeal ?? s.autoheal ?? false,
         lastRestart: s.lastRestart ?? s.last_restart,
+        restartCount: s.restart_count,
+        health: s.health,
       }))
     : mockServices;
 
-  return { services: data, isLoading: q.isLoading, isLive: !!q.data, error: q.error };
+  return { services: data, isLoading: q.isLoading, isLive: !!q.data, error: q.error, refetch: q.refetch };
 }
 
 // ---------- Incidents → timeline ----------
@@ -128,16 +133,19 @@ export function useIncidents() {
           i.severity ??
           (status === "danger" ? "critical" : status === "warning" ? "warning" : "resolved");
         return {
+          id: i.id,
           time: i.time,
+          service: i.service,
           text: `${i.service} ${i.status}`,
           status,
           detail: i.detail ?? "",
+          action: i.action,
           severity,
         };
       })
     : mockTimeline.map((t) => ({ ...t, severity: t.status === "danger" ? "critical" : t.status === "warning" ? "warning" : "resolved" }));
 
-  return { timeline, isLoading: q.isLoading, isLive: !!q.data, error: q.error };
+  return { timeline, isLoading: q.isLoading, isLive: !!q.data, error: q.error, refetch: q.refetch };
 }
 
 // ---------- Notifications → event feed ----------
@@ -154,37 +162,55 @@ export function useNotifications() {
     ? q.data.slice(0, 12).map((n: NotificationDTO) => ({
         time: n.time,
         text: n.text,
-        status: normalizeStatus(n.level),
+        status: normalizeStatus(n.status ?? n.level),
+        channel: n.channel,
+        deliveryStatus: n.status,
       }))
     : mockEvents;
 
-  return { events, isLoading: q.isLoading, isLive: !!q.data, error: q.error };
+  return { events, isLoading: q.isLoading, isLive: !!q.data, error: q.error, refetch: q.refetch };
+}
+
+// ---------- Alerts ----------
+export function useAlerts() {
+  const q = useQuery({
+    queryKey: ["alerts"],
+    queryFn: endpoints.alerts,
+    enabled: API_CONFIGURED,
+    refetchInterval: 8000,
+    retry: 1,
+  });
+  const alerts: AlertDTO[] = q.data ?? [];
+  return { alerts, isLoading: q.isLoading, isLive: !!q.data, error: q.error, refetch: q.refetch };
 }
 
 // ---------- Metrics → live charts ----------
 function toSeries(points: MetricPoint[] | undefined, fallback: { t: number; v: number }[]) {
   if (!points || points.length === 0) return fallback;
-  return points.slice(-48).map((p, i) => ({ t: i, v: Math.max(0, Math.min(100, Number(p.v) || 0)) }));
+  return points.slice(-96).map((p, i) => ({ t: i, v: Math.max(0, Math.min(100, Number(p.v) || 0)) }));
 }
 
-export function useMetrics() {
-  const q = useQuery({
-    queryKey: ["metrics"],
-    queryFn: endpoints.metrics,
+const RANGE_POINTS: Record<RangeKey, number> = { "15m": 15, "1h": 48, "6h": 72, "24h": 96 };
+
+export function useMetrics(range: RangeKey = "1h") {
+  const q = useQuery<MetricsDTO>({
+    queryKey: ["metrics", range],
+    queryFn: () => endpoints.metrics(range),
     enabled: API_CONFIGURED,
     refetchInterval: 5000,
     retry: 1,
   });
 
+  const n = RANGE_POINTS[range] ?? 48;
   const d = q.data;
   const series = {
-    cpu: toSeries(d?.cpu, genSeries(48, 21, 12)),
-    ram: toSeries(d?.memory, genSeries(48, 53, 8)),
-    disk: toSeries(d?.disk, genSeries(48, 34, 22)),
-    net: toSeries(d?.network, genSeries(48, 40, 26)),
+    cpu: toSeries(d?.cpu, genSeries(n, 21, 12)),
+    ram: toSeries(d?.memory, genSeries(n, 53, 8)),
+    disk: toSeries(d?.disk, genSeries(n, 34, 22)),
+    net: toSeries(d?.network, genSeries(n, 40, 26)),
   };
 
-  return { series, isLoading: q.isLoading, isLive: !!d, error: q.error };
+  return { series, isLoading: q.isLoading, isLive: !!d, error: q.error, refetch: q.refetch };
 }
 
 // ---------- AI summary ----------
@@ -197,16 +223,52 @@ export function useAiSummary() {
     retry: 1,
   });
   const d = q.data;
+  const risks = Array.isArray(d?.risks) ? d?.risks : d?.risks ? [d.risks] : [];
   return {
     summary: d?.summary,
     recommendation: d?.recommendation,
+    risks,
+    prediction: d?.prediction,
+    aiStatus: d?.status,
     healthyServices: d?.healthy_services,
     recoveredToday: d?.recovered_today,
     incidentsOpen: d?.incidents_open,
     isLive: !!d,
     isLoading: q.isLoading,
+    error: q.error,
+    refetch: q.refetch,
   };
 }
 
-export type { MonitoringDTO };
+// ---------- Mutations ----------
+export function useRestartService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => endpoints.restartService(name),
+    onMutate: async (name: string) => {
+      await qc.cancelQueries({ queryKey: ["services"] });
+      const prev = qc.getQueryData<any[]>(["services"]);
+      if (prev) {
+        qc.setQueryData<any[]>(["services"], prev.map((s) => s.name === name ? { ...s, status: "restarting" } : s));
+      }
+      return { prev };
+    },
+    onError: (_e, _n, ctx) => { if (ctx?.prev) qc.setQueryData(["services"], ctx.prev); },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["services"] });
+      qc.invalidateQueries({ queryKey: ["incidents"] });
+    },
+  });
+}
 
+export function useRunScan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: endpoints.runScan,
+    onSettled: () => qc.invalidateQueries({ queryKey: ["monitoring"] }),
+  });
+}
+
+export function useCreateBackup() {
+  return useMutation({ mutationFn: endpoints.createBackup });
+}
