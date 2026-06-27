@@ -102,10 +102,16 @@ function PageHeader() {
 
 function GuardianHero() {
   const [secondsAgo, setSecondsAgo] = useState(12);
+  const { summary, recommendation, isLive } = useAiSummary();
   useEffect(() => {
     const id = setInterval(() => setSecondsAgo((s) => (s >= 59 ? 1 : s + 1)), 1000);
     return () => clearInterval(id);
   }, []);
+
+  const recoText = recommendation ?? "Increase n8n memory limit to 768MB — peaked at 812MB / 1GB twice today.";
+  const summaryItems = summary
+    ? [summary]
+    : ["42 services healthy", "2 incidents auto-recovered today", "No critical alerts"];
 
   return (
     <motion.section
@@ -134,25 +140,27 @@ function GuardianHero() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="shimmer-text text-xl font-semibold tracking-tight">Guardian AI</h2>
-                <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success ring-1 ring-success/30">Healthy</span>
+                <span className="rounded-full bg-success/15 px-2 py-0.5 text-[10px] font-medium text-success ring-1 ring-success/30">
+                  {isLive ? "Live" : "Healthy"}
+                </span>
               </div>
               <p className="text-xs text-muted-foreground">Autonomous SRE · v1.2.0</p>
             </div>
           </div>
 
           <ul className="mt-4 space-y-1.5 text-sm">
-            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> 42 services healthy</li>
-            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> 2 incidents auto-recovered today</li>
-            <li className="flex items-center gap-2"><CheckCircle2 className="h-4 w-4 text-success" /> No critical alerts</li>
+            {summaryItems.map((t, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" /> <span>{t}</span>
+              </li>
+            ))}
           </ul>
 
           <div className="mt-4 rounded-lg border border-warning/30 bg-warning/10 px-3 py-2.5">
             <div className="flex items-center gap-2 text-[11px] font-medium uppercase tracking-wider text-warning">
               <Lightbulb className="h-3.5 w-3.5" /> Recommendation
             </div>
-            <p className="mt-1 text-sm text-foreground/90">
-              Increase <code className="rounded bg-background/50 px-1 text-warning">n8n</code> memory limit to <span className="font-medium">768MB</span> — peaked at 812MB / 1GB twice today.
-            </p>
+            <p className="mt-1 text-sm text-foreground/90">{recoText}</p>
           </div>
         </div>
 
@@ -168,6 +176,7 @@ function GuardianHero() {
     </motion.section>
   );
 }
+
 
 function MetricGrid() {
   const { metrics } = useMonitoring();
