@@ -383,7 +383,7 @@ function IncidentTimeline() {
                 transition={{ delay: i * 0.08 }}
                 className="relative grid grid-cols-[16px_60px_1fr] items-start gap-3 py-2"
               >
-                <span className={`mt-1.5 status-dot ${statusColor[step.status]} z-10`} />
+                <span className={`mt-1.5 status-dot ${statusColor[step.status as Status]} z-10`} />
                 <span className="mt-0.5 text-xs tabular-nums text-muted-foreground">{step.time}</span>
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
