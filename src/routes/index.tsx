@@ -63,11 +63,14 @@ function Dashboard() {
     <AppShell>
       <div className="mx-auto flex max-w-[1600px] flex-col gap-6">
         <PageHeader />
+        <SystemStatusHeader />
         <GuardianHero />
         <MetricGrid />
+        <QuickActions />
         <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
           <div className="flex flex-col gap-6">
             <ChartsCard range={range} setRange={setRange} />
+            <ActiveAlerts />
             <InfraStatus />
             <IncidentTimeline />
             <ServicesPreview />
@@ -86,6 +89,7 @@ function Dashboard() {
     </AppShell>
   );
 }
+
 
 function PageHeader() {
   return (
