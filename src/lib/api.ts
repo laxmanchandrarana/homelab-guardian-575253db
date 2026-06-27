@@ -59,9 +59,16 @@ export type MonitoringDTO = {
   memory: number;
   disk: number;
   network: string | number;
+  network_up?: number | string;
+  network_down?: number | string;
+  containers_total?: number;
   health_score?: number;
   healthy_services?: number;
   down_services?: number;
+  status?: string;
+  last_scan?: string;
+  last_update?: string;
+  api_status?: string;
 };
 
 export type DashboardDTO = MonitoringDTO & {
@@ -80,13 +87,17 @@ export type ServiceDTO = {
   autoHeal?: boolean;
   lastRestart?: string;
   last_restart?: string;
+  restart_count?: number;
+  health?: string;
 };
 
 export type IncidentDTO = {
+  id?: string | number;
   service: string;
   status: string;
   time: string;
   detail?: string;
+  action?: string;
   severity?: "critical" | "warning" | "resolved" | "info";
 };
 
@@ -95,6 +106,17 @@ export type NotificationDTO = {
   time: string;
   text: string;
   level?: "info" | "warning" | "danger" | "healthy";
+  channel?: "telegram" | "discord" | "slack" | "email" | string;
+  status?: "delivered" | "pending" | "failed" | string;
+};
+
+export type AlertDTO = {
+  id?: string | number;
+  severity?: "critical" | "warning" | "info";
+  service?: string;
+  message?: string;
+  started?: string;
+  duration?: string;
 };
 
 export type MetricPoint = { t: number | string; v: number };
@@ -108,6 +130,9 @@ export type MetricsDTO = {
 export type AiSummaryDTO = {
   summary: string;
   recommendation?: string;
+  risks?: string[] | string;
+  prediction?: string;
+  status?: string;
   healthy_services?: number;
   recovered_today?: number;
   incidents_open?: number;
@@ -118,10 +143,14 @@ export const endpoints = {
   dashboard: () => api<DashboardDTO>("/dashboard"),
   services: () => api<ServiceDTO[]>("/services"),
   incidents: () => api<IncidentDTO[]>("/incidents"),
-  metrics: () => api<MetricsDTO>("/metrics"),
+  metrics: (range?: RangeKey) => api<MetricsDTO>(`/metrics${range ? `?range=${range}` : ""}`),
   notifications: () => api<NotificationDTO[]>("/notifications"),
+  alerts: () => api<AlertDTO[]>("/alerts"),
   aiSummary: () => api<AiSummaryDTO>("/ai/summary"),
   health: () => api<{ status: string }>("/health"),
   restartService: (service: string) =>
     api<{ ok: boolean }>(`/incidents/${encodeURIComponent(service)}`, { method: "POST" }),
+  runScan: () => api<{ ok: boolean }>(`/scan`, { method: "POST" }),
+  createBackup: () => api<{ ok: boolean }>(`/backup`, { method: "POST" }),
 };
+
