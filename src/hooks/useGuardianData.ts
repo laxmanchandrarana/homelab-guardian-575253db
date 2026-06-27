@@ -55,11 +55,35 @@ export function useMonitoring() {
             display: typeof live.network === "string" ? live.network : undefined,
             value: typeof live.network === "number" ? live.network : m.value,
           };
+        if (m.id === "services" && typeof live.healthy_services === "number")
+          return { ...m, value: live.healthy_services, display: String(live.healthy_services) };
+        if (m.id === "incidents" && typeof live.down_services === "number")
+          return { ...m, value: live.down_services, display: String(live.down_services) };
         return m;
       })
     : mockTopMetrics;
 
-  return { metrics, isLoading: q.isLoading, isLive: !!live, error: q.error };
+  return {
+    metrics,
+    healthScore: typeof live?.health_score === "number" ? live.health_score : undefined,
+    healthyServices: live?.healthy_services,
+    downServices: live?.down_services,
+    isLoading: q.isLoading,
+    isLive: !!live,
+    error: q.error,
+  };
+}
+
+// ---------- Dashboard summary (optional /dashboard) ----------
+export function useDashboard() {
+  const q = useQuery({
+    queryKey: ["dashboard"],
+    queryFn: endpoints.dashboard,
+    enabled: API_CONFIGURED,
+    refetchInterval: 10000,
+    retry: 0,
+  });
+  return { data: q.data, isLive: !!q.data, isLoading: q.isLoading };
 }
 
 // ---------- Services ----------
