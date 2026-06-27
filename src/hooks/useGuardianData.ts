@@ -122,13 +122,20 @@ export function useIncidents() {
   });
 
   const timeline = q.data
-    ? q.data.slice(0, 10).map((i: IncidentDTO) => ({
-        time: i.time,
-        text: `${i.service} ${i.status}`,
-        status: normalizeStatus(i.status),
-        detail: i.detail ?? "",
-      }))
-    : mockTimeline;
+    ? q.data.slice(0, 10).map((i: IncidentDTO) => {
+        const status = normalizeStatus(i.status);
+        const severity =
+          i.severity ??
+          (status === "danger" ? "critical" : status === "warning" ? "warning" : "resolved");
+        return {
+          time: i.time,
+          text: `${i.service} ${i.status}`,
+          status,
+          detail: i.detail ?? "",
+          severity,
+        };
+      })
+    : mockTimeline.map((t) => ({ ...t, severity: t.status === "danger" ? "critical" : t.status === "warning" ? "warning" : "resolved" }));
 
   return { timeline, isLoading: q.isLoading, isLive: !!q.data, error: q.error };
 }
