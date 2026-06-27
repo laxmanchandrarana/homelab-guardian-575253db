@@ -88,8 +88,22 @@ export type ServiceDTO = {
   lastRestart?: string;
   last_restart?: string;
   restart_count?: number;
+  restarts?: number;
   health?: string;
+  container_name?: string;
+  image?: string;
 };
+
+export type ServiceDetailDTO = ServiceDTO & {
+  ports?: (string | { container?: number | string; host?: number | string; protocol?: string })[];
+  networks?: string[];
+  volumes?: (string | { source?: string; target?: string })[];
+  env?: Record<string, string> | string[];
+  environment?: Record<string, string> | string[];
+  created?: string;
+  created_at?: string;
+};
+
 
 export type IncidentDTO = {
   id?: string | number;
