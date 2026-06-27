@@ -177,7 +177,11 @@ function IncidentsPage() {
   const [selectedId, setSelectedId] = useState<string | number | null>(null);
 
   const rows: TimelineRow[] = useMemo(
-    () => timeline.map((t, i) => ({ ...t, rawId: t.id ?? `${t.service}-${i}` })),
+    () =>
+      (timeline as unknown as TimelineRow[]).map((t, i) => ({
+        ...t,
+        rawId: t.id ?? `${t.service ?? "incident"}-${i}`,
+      })),
     [timeline],
   );
 
