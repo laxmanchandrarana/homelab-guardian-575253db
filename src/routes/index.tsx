@@ -421,7 +421,7 @@ function ServicesPreview() {
     <section className="surface-card p-5">
       <div className="mb-4 flex items-center justify-between">
         <h3 className="text-sm font-semibold">Services</h3>
-        <button className="text-xs text-primary hover:underline">View all</button>
+        <button onClick={() => navigate({ to: "/services" })} className="text-xs text-primary hover:underline">View all</button>
       </div>
       {isLoading && services.length === 0 ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -429,7 +429,12 @@ function ServicesPreview() {
             <div key={i} className="h-32 animate-pulse rounded-lg border border-border bg-background/40" />
           ))}
         </div>
+      ) : error && services.length === 0 ? (
+        <ErrorCard message="Couldn't load services" onRetry={() => refetch()} />
+      ) : services.length === 0 ? (
+        <EmptyState label="No services found" />
       ) : (
+
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {services.map((s) => (
           <motion.div
