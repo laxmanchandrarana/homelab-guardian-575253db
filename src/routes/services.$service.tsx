@@ -430,7 +430,7 @@ function ServiceDetailPage() {
               <Button size="sm" variant="outline" onClick={() => doAction(start, "Started")} disabled={start.isPending}>
                 <Play className="size-3.5" /> Start
               </Button>
-              <Button size="sm" variant="outline" onClick={() => doAction(stop, "Stopped")} disabled={stop.isPending}>
+              <Button size="sm" variant="outline" onClick={() => setConfirm("stop")} disabled={stop.isPending}>
                 <Square className="size-3.5" /> Stop
               </Button>
               <Button size="sm" variant="outline" onClick={() => doAction(pause, "Paused")} disabled={pause.isPending}>
@@ -439,11 +439,22 @@ function ServiceDetailPage() {
               <Button size="sm" variant="outline" onClick={() => doAction(resume, "Resumed")} disabled={resume.isPending}>
                 <PlayCircle className="size-3.5" /> Resume
               </Button>
-              <Button size="sm" onClick={() => doAction(restart, "Restarted")} disabled={restart.isPending}>
+              <Button size="sm" onClick={() => setConfirm("restart")} disabled={restart.isPending}>
                 <RotateCw className={cn("size-3.5", restart.isPending && "animate-spin")} /> Restart
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setLogsOpen(true)}>
                 <Terminal className="size-3.5" /> Logs
+              </Button>
+              <Button size="sm" variant="ghost" onClick={openExternal}>
+                <ExternalLink className="size-3.5" /> Open
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setConfirm("delete")}
+                disabled={del.isPending}
+              >
+                <Trash2 className="size-3.5" /> Delete
               </Button>
               {(d.container_id || d.id) && (
                 <Button size="sm" variant="ghost" onClick={() => copyText(String(d.container_id ?? d.id), "Container ID")}>
@@ -457,13 +468,6 @@ function ServiceDetailPage() {
               >
                 <Copy className="size-3.5" /> docker
               </Button>
-              {d.url && (
-                <a href={d.url} target="_blank" rel="noreferrer">
-                  <Button size="sm" variant="ghost">
-                    <ExternalLink className="size-3.5" /> Open
-                  </Button>
-                </a>
-              )}
               {d.portainer_url && (
                 <a href={d.portainer_url} target="_blank" rel="noreferrer">
                   <Button size="sm" variant="ghost">
@@ -472,6 +476,7 @@ function ServiceDetailPage() {
                 </a>
               )}
             </div>
+
           </div>
         </Card>
 
