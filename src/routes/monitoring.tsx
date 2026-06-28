@@ -188,7 +188,7 @@ function MonitoringExplorer() {
   const { series, isLoading, isLive, refetch } = useMetrics(range);
   const { services } = useServices();
   const { timeline } = useIncidents();
-  const { friendlyStatus } = useGuardianSocket();
+  const socket = useGuardianSocket();
 
   // Auto-refresh
   useEffect(() => {
