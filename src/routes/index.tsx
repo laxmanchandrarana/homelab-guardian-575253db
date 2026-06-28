@@ -483,21 +483,28 @@ function ServicesPreview() {
             {(s as any).lastRestart && (
               <div className="mt-2 text-[10px] text-muted-foreground">Last restart · {(s as any).lastRestart}</div>
             )}
-            <div className="mt-3 flex gap-1.5">
+            <div className="mt-3 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
               <button
-                onClick={() => API_CONFIGURED && restart.mutate(s.name)}
+                onClick={(e) => { e.stopPropagation(); API_CONFIGURED && restart.mutate(s.name); }}
                 disabled={restart.isPending && restart.variables === s.name}
                 className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-50"
               >
                 <RotateCw className={`h-3 w-3 ${restart.isPending && restart.variables === s.name ? "animate-spin" : ""}`} /> Restart
               </button>
-              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate({ to: "/services/$service", params: { service: s.name } }); }}
+                className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent"
+              >
                 <FileText className="h-3 w-3" /> Logs
               </button>
-              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate({ to: "/services/$service", params: { service: s.name } }); }}
+                className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent"
+              >
                 <BarChart3 className="h-3 w-3" /> Metrics
               </button>
             </div>
+
           </motion.div>
         ))}
       </div>
