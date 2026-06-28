@@ -308,7 +308,7 @@ function MonitoringExplorer() {
             <span className={cn("status-dot", isLive ? "text-success" : "text-warning")} />
             <span className="text-muted-foreground">{isLive ? "Live data" : "Demo mode"}</span>
             <span className="mx-2 text-border">·</span>
-            <span className="text-muted-foreground">WS: {friendlyStatus.label}</span>
+            <span className="text-muted-foreground">WS: {socket.label}</span>
           </div>
         </div>
 
