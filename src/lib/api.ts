@@ -691,6 +691,134 @@ export const endpoints = {
     api<{ recommendation?: string; summary?: string }>("/ai/backup-analysis", {
       noRetry: true,
     }).catch(() => null),
+
+  // ---------- Automation (Phase 4.1) ----------
+  // Backend endpoints not yet implemented — calls 404 gracefully and the UI
+  // shows clear empty/error states until the FastAPI routes ship.
+  automationRules: () => api<AutomationRule[]>("/automation/rules", { noRetry: true }),
+  automationCreateRule: (body: Omit<AutomationRule, "id">) =>
+    api<AutomationRule>("/automation/rules", {
+      method: "POST",
+      body: JSON.stringify(body),
+      noRetry: true,
+    }),
+  automationUpdateRule: (id: number | string, body: Partial<AutomationRule>) =>
+    api<AutomationRule>(`/automation/rules/${enc(String(id))}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+      noRetry: true,
+    }),
+  automationDeleteRule: (id: number | string) =>
+    api<{ ok: boolean }>(`/automation/rules/${enc(String(id))}`, {
+      method: "DELETE",
+      noRetry: true,
+    }).then(() => ({ ok: true })),
+  automationRunRule: (id: number | string) =>
+    api<{ ok: boolean; job?: string }>(`/automation/rules/${enc(String(id))}/run`, {
+      method: "POST",
+      noRetry: true,
+    }),
+  automationToggleRule: (id: number | string, enabled: boolean) =>
+    api<AutomationRule>(`/automation/rules/${enc(String(id))}/toggle`, {
+      method: "POST",
+      body: JSON.stringify({ enabled }),
+      noRetry: true,
+    }),
+  automationJobs: () => api<AutomationJob[]>("/automation/jobs", { noRetry: true }),
+  automationRuleDetail: (id: number | string) =>
+    api<AutomationRuleDetail>(`/automation/rules/${enc(String(id))}`, { noRetry: true }),
+  automationLogs: (params?: { rule?: string | number; limit?: number }) => {
+    const qs = new URLSearchParams();
+    if (params?.rule != null) qs.set("rule", String(params.rule));
+    if (params?.limit) qs.set("limit", String(params.limit));
+    const q = qs.toString();
+    return api<AutomationLogEntry[]>(`/automation/logs${q ? `?${q}` : ""}`, { noRetry: true });
+  },
+  automationMetrics: () => api<AutomationMetrics>("/automation/metrics", { noRetry: true }),
+  automationAi: () =>
+    api<{ recommendation?: string; summary?: string; suggestions?: string[] }>("/ai/automation", {
+      noRetry: true,
+    }),
+};
+
+// ---------- Automation DTOs ----------
+
+export type AutomationTrigger =
+  | "container_down"
+  | "high_cpu"
+  | "high_memory"
+  | "disk_full"
+  | "website_down"
+  | "backup_failed"
+  | "ssl_expiring"
+  | "custom_alert";
+
+export type AutomationAction =
+  | "restart_container"
+  | "restart_compose_stack"
+  | "restart_docker_service"
+  | "run_shell_script"
+  | "execute_python"
+  | "run_ansible"
+  | "webhook"
+  | "send_notification"
+  | "run_ai_diagnosis";
+
+export type AutomationRule = {
+  id: number | string;
+  name: string;
+  trigger: AutomationTrigger | string;
+  target: string;
+  action: AutomationAction | string;
+  cooldown?: string;
+  retries?: number;
+  timeout?: string;
+  priority?: "low" | "normal" | "high" | "critical";
+  enabled: boolean;
+  last_run?: string | null;
+  last_status?: "success" | "failed" | "running" | "pending" | null;
+};
+
+export type AutomationJob = {
+  job: string;
+  rule_id?: number | string;
+  rule_name?: string;
+  triggered_by?: string;
+  service?: string;
+  action?: string;
+  progress?: number;
+  duration?: string;
+  status?: "running" | "success" | "failed" | "pending" | "cancelled";
+  started?: string;
+  finished?: string | null;
+};
+
+export type AutomationLogEntry = {
+  id?: number | string;
+  timestamp: string;
+  container?: string;
+  command?: string;
+  output?: string;
+  exit_code?: number;
+  status?: string;
+};
+
+export type AutomationMetrics = {
+  success_rate?: number;
+  avg_recovery_seconds?: number;
+  coverage?: number;
+  failures_today?: number;
+  successes_today?: number;
+  pending?: number;
+};
+
+export type AutomationRuleDetail = AutomationRule & {
+  execution_count?: number;
+  avg_duration_seconds?: number;
+  success_rate?: number;
+  history?: AutomationLogEntry[];
+  failures?: AutomationLogEntry[];
+  timeline?: { time: string; event: string }[];
 };
 
 // ---------- Backup DTOs ----------
