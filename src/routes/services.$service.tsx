@@ -315,6 +315,7 @@ function ServiceDetailPage() {
   const scoreLabel = score >= 90 ? "Excellent" : score >= 70 ? "Good" : score >= 50 ? "Fair" : "Poor";
 
   const [logsOpen, setLogsOpen] = useState(false);
+  const [confirm, setConfirm] = useState<null | "stop" | "restart" | "delete">(null);
 
   const doAction = async (
     fn: { mutateAsync: (n: string) => Promise<unknown> },
@@ -327,6 +328,34 @@ function ServiceDetailPage() {
       toast.error(`${verb} failed: ${e?.message ?? "error"}`);
     }
   };
+
+  const doDelete = async () => {
+    try {
+      await del.mutateAsync(service);
+      toast.success(`Deleted ${service}`);
+      navigate({ to: "/services" });
+    } catch (e: any) {
+      toast.error(`Delete failed: ${e?.message ?? "error"}`);
+    }
+  };
+
+  const openExternal = () => {
+    const url = d.url ?? d.external_url ?? d.web_url;
+    if (typeof url === "string" && url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    } else {
+      toast.message("No external URL exposed for this service");
+    }
+  };
+
+  const onConfirm = () => {
+    const c = confirm;
+    setConfirm(null);
+    if (c === "stop") doAction(stop, "Stopped");
+    else if (c === "restart") doAction(restart, "Restarted");
+    else if (c === "delete") doDelete();
+  };
+
 
   return (
     <AppShell>
