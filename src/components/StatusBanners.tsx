@@ -1,13 +1,18 @@
+import { useEffect, useState } from "react";
 import { useBackendStatus } from "@/hooks/useBackendStatus";
 import { WifiOff, ServerCrash, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 /**
  * Sticky banner shown when the browser is offline OR the backend is unreachable.
- * Never breaks layout — renders nothing when everything is healthy.
+ * Renders nothing during SSR/first paint to avoid hydration mismatches.
  */
 export function StatusBanners() {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const { browserOnline, backendOnline, isChecking, refresh } = useBackendStatus();
+
+  if (!mounted) return null;
 
   if (!browserOnline) {
     return (

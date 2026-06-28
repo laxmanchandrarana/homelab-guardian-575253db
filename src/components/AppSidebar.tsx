@@ -12,6 +12,7 @@ import {
   Shield,
   ChevronLeft,
   HardDriveDownload,
+  Zap,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ const nav = [
   { to: "/services", label: "Services", icon: Boxes },
   { to: "/monitoring", label: "Monitoring", icon: Activity },
   { to: "/incidents", label: "Incidents", icon: AlertTriangle },
+  { to: "/automation", label: "Automation", icon: Zap },
   { to: "/topology", label: "Topology", icon: Network },
   { to: "/backups", label: "Backups", icon: HardDriveDownload },
   { to: "/notifications", label: "Notifications", icon: Bell },
