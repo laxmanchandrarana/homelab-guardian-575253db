@@ -354,6 +354,45 @@ export function useRunScan() {
 }
 
 export function useCreateBackup() {
-  return useMutation({ mutationFn: endpoints.createBackup });
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: endpoints.createBackup,
+    onSettled: () => qc.invalidateQueries({ queryKey: ["backup-summary"] }),
+  });
 }
+
+export function useBackupSummary() {
+  const q = useQuery({
+    queryKey: ["backup-summary"],
+    queryFn: async () => {
+      const [files, latest] = await Promise.all([
+        endpoints.backupFiles().catch(() => [] as any[]),
+        endpoints.backupLatest().catch(() => null),
+      ]);
+      const totalBytes = (files as any[]).reduce((s, f: any) => s + (Number(f.size) || 0), 0);
+      const success = (files as any[]).filter(
+        (f: any) => String(f.status).toUpperCase() === "SUCCESS",
+      ).length;
+      return {
+        count: files.length,
+        latest,
+        totalBytes,
+        successRate: files.length ? Math.round((success / files.length) * 100) : null,
+      };
+    },
+    enabled: API_CONFIGURED,
+    refetchInterval: 60_000,
+    retry: 1,
+  });
+  return {
+    count: q.data?.count ?? 0,
+    latest: q.data?.latest ?? null,
+    totalBytes: q.data?.totalBytes ?? 0,
+    successRate: q.data?.successRate ?? null,
+    isLoading: q.isLoading,
+    error: q.error,
+    refetch: q.refetch,
+  };
+}
+
 
