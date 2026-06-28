@@ -11,6 +11,7 @@ import {
   Settings,
   Shield,
   ChevronLeft,
+  HardDriveDownload,
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -21,6 +22,7 @@ const nav = [
   { to: "/monitoring", label: "Monitoring", icon: Activity },
   { to: "/incidents", label: "Incidents", icon: AlertTriangle },
   { to: "/topology", label: "Topology", icon: Network },
+  { to: "/backups", label: "Backups", icon: HardDriveDownload },
   { to: "/notifications", label: "Notifications", icon: Bell },
   { to: "/ai", label: "AI Assistant", icon: Sparkles },
   { to: "/settings", label: "Settings", icon: Settings },
