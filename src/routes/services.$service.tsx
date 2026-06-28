@@ -637,6 +637,37 @@ function ServiceDetailPage() {
       </div>
 
       <LogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} service={service} />
+
+      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirm === "delete"
+                ? `Delete ${service}?`
+                : confirm === "stop"
+                  ? `Stop ${service}?`
+                  : `Restart ${service}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm === "delete"
+                ? "This permanently removes the container. Volumes may persist depending on your Docker config. This action cannot be undone."
+                : confirm === "stop"
+                  ? "This will stop the container. Dependent services may break until it's started again."
+                  : "The container will briefly be unavailable while it restarts."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onConfirm}
+              className={confirm === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined}
+            >
+              {confirm === "delete" ? "Delete" : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </AppShell>
   );
 }
