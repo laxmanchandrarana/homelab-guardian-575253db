@@ -527,6 +527,7 @@ function ServiceDetailPage() {
           {/* Right: side panels */}
           <div className="space-y-5">
             <PerformanceScore score={score} label={scoreLabel} />
+            <PredictionCard data={predictionQ.data} isLoading={predictionQ.isLoading} />
 
             <Card>
               <SectionHeader icon={Heart} title="Health Checks" />
