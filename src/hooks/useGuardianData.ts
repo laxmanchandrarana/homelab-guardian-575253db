@@ -290,6 +290,18 @@ function makeServiceActionHook(
 export const useStartService = makeServiceActionHook(endpoints.startService, "starting");
 export const useStopService = makeServiceActionHook(endpoints.stopService, "stopping");
 export const useRestartServiceDirect = makeServiceActionHook(endpoints.restartServiceDirect, "restarting");
+export const usePauseService = makeServiceActionHook(endpoints.pauseService, "pausing");
+export const useResumeService = makeServiceActionHook(endpoints.resumeService, "resuming");
+
+export function useServicePrediction(name: string | null) {
+  return useQuery({
+    queryKey: ["service-prediction", name],
+    queryFn: () => endpoints.servicePrediction(name as string),
+    enabled: API_CONFIGURED && !!name,
+    refetchInterval: 60_000,
+    retry: 0,
+  });
+}
 
 export function useServiceDetail(name: string | null) {
   return useQuery({
