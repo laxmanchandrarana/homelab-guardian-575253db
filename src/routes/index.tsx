@@ -74,6 +74,8 @@ function Dashboard() {
             <ChartsCard range={range} setRange={setRange} />
             <ActiveAlerts />
             <BackupSummary />
+            <InfraStatus />
+
 
             <IncidentTimeline />
             <ServicesPreview />
