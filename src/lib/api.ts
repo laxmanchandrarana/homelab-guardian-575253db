@@ -586,4 +586,164 @@ export const endpoints = {
     disk: [],
     network: [],
   }),
+
+  // Topology — try real endpoint, fall back to synthesis from /containers.
+  topology: async (): Promise<TopologyDTO> => {
+    try {
+      const raw = await api<unknown>("/topology", { noRetry: true });
+      const r = (raw ?? {}) as { nodes?: unknown[]; edges?: unknown[] };
+      const nodes = arr<Record<string, unknown>>(r.nodes).map((n) => ({
+        id: str(n.id ?? n.name, "unknown"),
+        label: str(n.label ?? n.name ?? n.id, "unknown"),
+        type: classifyNodeType(str(n.type), str(n.label ?? n.name ?? n.id)),
+        status: normalizeTopoStatus(str(n.status)),
+        cpu: typeof n.cpu === "number" ? (n.cpu as number) : undefined,
+        memory: typeof n.memory === "number" ? (n.memory as number) : undefined,
+        uptime: str(n.uptime) || undefined,
+        image: str(n.image) || undefined,
+      }));
+      const edges = arr<Record<string, unknown>>(r.edges)
+        .map((e, i) => ({
+          id: str(e.id, `e-${i}`),
+          source: str(e.source ?? e.from, ""),
+          target: str(e.target ?? e.to, ""),
+          label: str(e.label) || undefined,
+        }))
+        .filter((e) => e.source && e.target);
+      if (nodes.length) return { nodes, edges };
+    } catch {
+      // fall through to synthesis
+    }
+    return synthesizeTopology();
+  },
 };
+
+// ---------- Topology types & synthesis ----------
+
+export type TopoNodeType =
+  | "monitoring"
+  | "application"
+  | "database"
+  | "proxy"
+  | "storage"
+  | "network"
+  | "ai"
+  | "notification"
+  | "container"
+  | "infrastructure"
+  | "unknown";
+
+export type TopoStatus = "healthy" | "warning" | "critical" | "offline";
+
+export type TopologyNode = {
+  id: string;
+  label: string;
+  type: TopoNodeType;
+  status: TopoStatus;
+  cpu?: number;
+  memory?: number;
+  uptime?: string;
+  image?: string;
+};
+
+export type TopologyEdge = {
+  id: string;
+  source: string;
+  target: string;
+  label?: string;
+};
+
+export type TopologyDTO = { nodes: TopologyNode[]; edges: TopologyEdge[] };
+
+function normalizeTopoStatus(s: string): TopoStatus {
+  const v = s.toLowerCase();
+  if (["healthy", "running", "ok", "up"].includes(v)) return "healthy";
+  if (["warning", "warn", "degraded", "restarting"].includes(v)) return "warning";
+  if (["critical", "error", "failed", "down"].includes(v)) return "critical";
+  if (["offline", "stopped", "exited", "dead"].includes(v)) return "offline";
+  return "healthy";
+}
+
+function classifyNodeType(explicit: string, name: string): TopoNodeType {
+  const e = explicit.toLowerCase();
+  if (
+    [
+      "monitoring",
+      "application",
+      "database",
+      "proxy",
+      "storage",
+      "network",
+      "ai",
+      "notification",
+      "container",
+      "infrastructure",
+    ].includes(e)
+  )
+    return e as TopoNodeType;
+  const n = name.toLowerCase();
+  if (/(prometheus|grafana|alertmanager|cadvisor|exporter|loki|uptime|kuma|netdata)/.test(n)) return "monitoring";
+  if (/(traefik|nginx|caddy|haproxy|tunnel|cloudflared)/.test(n)) return "proxy";
+  if (/(postgres|mysql|maria|mongo|redis|sqlite|influx|clickhouse|cockroach)/.test(n)) return "database";
+  if (/(minio|s3|nfs|samba|seafile|nextcloud)/.test(n)) return "storage";
+  if (/(ollama|guardian|openai|whisper|llama|stable|comfy)/.test(n)) return "ai";
+  if (/(telegram|discord|gotify|ntfy|smtp|mail)/.test(n)) return "notification";
+  if (/(pihole|adguard|wireguard|tailscale|vpn|dns)/.test(n)) return "network";
+  if (/(portainer|docker|watchtower)/.test(n)) return "infrastructure";
+  return "application";
+}
+
+async function synthesizeTopology(): Promise<TopologyDTO> {
+  const containers = await api<unknown[]>("/containers").catch(() => [] as unknown[]);
+  const services = arr<unknown>(containers).map(normalizeContainer);
+
+  const backbone: TopologyNode[] = [
+    { id: "internet", label: "Internet", type: "network", status: "healthy" },
+    { id: "cloudflare", label: "Cloudflare Tunnel", type: "proxy", status: "healthy" },
+    { id: "traefik", label: "Traefik", type: "proxy", status: "healthy" },
+    { id: "docker", label: "Docker Engine", type: "infrastructure", status: "healthy" },
+  ];
+
+  const backboneIds = new Set(backbone.map((b) => b.id));
+  const seen = new Set<string>(backboneIds);
+  const nodes: TopologyNode[] = [...backbone];
+
+  for (const s of services) {
+    const id = s.name.toLowerCase();
+    if (seen.has(id)) continue;
+    seen.add(id);
+    nodes.push({
+      id,
+      label: s.name,
+      type: classifyNodeType("", s.name),
+      status: normalizeTopoStatus(s.status),
+      cpu: typeof s.cpu === "number" ? s.cpu : undefined,
+      memory: typeof s.memory === "number" ? (s.memory as number) : undefined,
+      uptime: s.uptime,
+      image: s.image,
+    });
+  }
+
+  const edges: TopologyEdge[] = [
+    { id: "e-internet-cf", source: "internet", target: "cloudflare" },
+    { id: "e-cf-traefik", source: "cloudflare", target: "traefik" },
+    { id: "e-traefik-docker", source: "traefik", target: "docker" },
+  ];
+
+  const webFacing = /^(homepage|portainer|grafana|nextcloud|guardian|n8n|jellyfin|plex|vaultwarden|gitea|wikijs|bookstack)/;
+  for (const n of nodes) {
+    if (backboneIds.has(n.id)) continue;
+    edges.push({ id: `e-docker-${n.id}`, source: "docker", target: n.id });
+    if (webFacing.test(n.id)) edges.push({ id: `e-traefik-${n.id}`, source: "traefik", target: n.id });
+  }
+
+  const has = (id: string) => seen.has(id);
+  if (has("prometheus")) {
+    if (has("alertmanager")) edges.push({ id: "e-prom-am", source: "prometheus", target: "alertmanager" });
+    if (has("node-exporter")) edges.push({ id: "e-prom-ne", source: "prometheus", target: "node-exporter" });
+    if (has("cadvisor")) edges.push({ id: "e-prom-cad", source: "prometheus", target: "cadvisor" });
+    if (has("guardian")) edges.push({ id: "e-guardian-prom", source: "guardian", target: "prometheus" });
+  }
+
+  return { nodes, edges };
+}
