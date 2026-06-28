@@ -57,11 +57,15 @@ import {
   useStartService,
   useStopService,
   useRestartServiceDirect,
+  usePauseService,
+  useResumeService,
+  useServicePrediction,
   useMetrics,
   useIncidents,
 } from "@/hooks/useGuardianData";
 import { useGuardianSocket } from "@/hooks/useGuardianSocket";
 import type { RangeKey } from "@/lib/api";
+import { Sparkles, PauseCircle } from "lucide-react";
 
 export const Route = createFileRoute("/services/$service")({
   head: () => ({ meta: [{ title: "Service — Homelab Guardian" }] }),
