@@ -16,6 +16,7 @@ import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as MonitoringRouteImport } from './routes/monitoring'
 import { Route as IncidentsRouteImport } from './routes/incidents'
 import { Route as BackupsRouteImport } from './routes/backups'
+import { Route as AutomationRouteImport } from './routes/automation'
 import { Route as AiRouteImport } from './routes/ai'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ServicesServiceRouteImport } from './routes/services.$service'
@@ -55,6 +56,11 @@ const BackupsRoute = BackupsRouteImport.update({
   path: '/backups',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AutomationRoute = AutomationRouteImport.update({
+  id: '/automation',
+  path: '/automation',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AiRoute = AiRouteImport.update({
   id: '/ai',
   path: '/ai',
@@ -74,6 +80,7 @@ const ServicesServiceRoute = ServicesServiceRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/automation': typeof AutomationRoute
   '/backups': typeof BackupsRoute
   '/incidents': typeof IncidentsRoute
   '/monitoring': typeof MonitoringRoute
@@ -86,6 +93,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/automation': typeof AutomationRoute
   '/backups': typeof BackupsRoute
   '/incidents': typeof IncidentsRoute
   '/monitoring': typeof MonitoringRoute
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/ai': typeof AiRoute
+  '/automation': typeof AutomationRoute
   '/backups': typeof BackupsRoute
   '/incidents': typeof IncidentsRoute
   '/monitoring': typeof MonitoringRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/ai'
+    | '/automation'
     | '/backups'
     | '/incidents'
     | '/monitoring'
@@ -125,6 +135,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/ai'
+    | '/automation'
     | '/backups'
     | '/incidents'
     | '/monitoring'
@@ -137,6 +148,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/ai'
+    | '/automation'
     | '/backups'
     | '/incidents'
     | '/monitoring'
@@ -150,6 +162,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AiRoute: typeof AiRoute
+  AutomationRoute: typeof AutomationRoute
   BackupsRoute: typeof BackupsRoute
   IncidentsRoute: typeof IncidentsRoute
   MonitoringRoute: typeof MonitoringRoute
@@ -210,6 +223,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BackupsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/automation': {
+      id: '/automation'
+      path: '/automation'
+      fullPath: '/automation'
+      preLoaderRoute: typeof AutomationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/ai': {
       id: '/ai'
       path: '/ai'
@@ -249,6 +269,7 @@ const ServicesRouteWithChildren = ServicesRoute._addFileChildren(
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AiRoute: AiRoute,
+  AutomationRoute: AutomationRoute,
   BackupsRoute: BackupsRoute,
   IncidentsRoute: IncidentsRoute,
   MonitoringRoute: MonitoringRoute,
