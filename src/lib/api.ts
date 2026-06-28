@@ -616,6 +616,109 @@ export const endpoints = {
     }
     return synthesizeTopology();
   },
+
+  // ---------- Backup & Restore ----------
+  backupHistory: async (): Promise<BackupHistoryItem[]> => {
+    const list = await api<unknown[]>("/backup/history");
+    return arr<Record<string, unknown>>(list).map((r) => ({
+      id: num(r.id),
+      filename: str(r.filename),
+      size: str(r.size, "—"),
+      sha256: str(r.sha256) || null,
+      created: str(r.created) || null,
+      verified: r.verified === true ? true : r.verified === false ? false : null,
+      status: (str(r.status).toUpperCase() as BackupHistoryItem["status"]) || "UNKNOWN",
+    }));
+  },
+  backupLatest: () =>
+    api<Partial<BackupHistoryItem> & { size?: number | string }>("/backup/latest").catch(
+      () => null,
+    ),
+  backupFiles: async (): Promise<BackupFile[]> => {
+    const list = await api<unknown[]>("/restore/backups");
+    return arr<Record<string, unknown>>(list).map((r) => ({
+      name: str(r.name),
+      size: num(r.size),
+      modified: num(r.modified),
+    }));
+  },
+  backupRun: () =>
+    api<{ ok?: boolean; job_id?: string } | unknown>("/backup/run", { method: "POST" }),
+  backupInfo: (name: string) =>
+    api<{ name: string; size: number; modified: number }>(`/restore/backup/${enc(name)}`),
+  backupVerify: (name: string) =>
+    api<{ ok?: boolean; sha256?: string; size?: number; valid?: boolean } | unknown>(
+      `/restore/verify/${enc(name)}`,
+    ),
+  backupPlan: (name: string) =>
+    api<{ backup: string; files: number; size: number; preview: string[] }>(
+      `/restore/plan/${enc(name)}`,
+    ),
+  restoreRun: (filename: string) =>
+    api<{ ok?: boolean; job_id?: string } | unknown>(`/restore/run/${enc(filename)}`, {
+      method: "POST",
+    }),
+  restoreJob: (filename: string) =>
+    api<{
+      filename?: string;
+      status?: string;
+      progress?: number;
+      current?: string;
+      speed?: string;
+      eta?: string;
+    } | unknown>(`/restore/job/${enc(filename)}`),
+  restoreHistory: async (): Promise<RestoreHistoryItem[]> => {
+    const list = await api<unknown[]>("/restore/history");
+    return arr<Record<string, unknown>>(list).map((r) => ({
+      id: num(r.id),
+      filename: str(r.filename),
+      started: str(r.started) || null,
+      completed: str(r.completed) || null,
+      status: (str(r.status).toUpperCase() as RestoreHistoryItem["status"]) || "UNKNOWN",
+    }));
+  },
+  restoreHealth: () =>
+    api<{
+      healthy: boolean;
+      total: number;
+      failed: string[];
+      containers: { name: string; status: string }[];
+    }>("/restore/health"),
+  restoreRollback: (filename: string) =>
+    api(`/restore/rollback/${enc(filename)}`, { method: "POST" }),
+  backupDownloadUrl: (filename: string) => `${API_URL}/restore/backup/${enc(filename)}/download`,
+  backupAiAnalysis: () =>
+    api<{ recommendation?: string; summary?: string }>("/ai/backup-analysis", {
+      noRetry: true,
+    }).catch(() => null),
+};
+
+// ---------- Backup DTOs ----------
+
+export type BackupStatus = "SUCCESS" | "FAILED" | "RUNNING" | "UNKNOWN";
+
+export type BackupHistoryItem = {
+  id: number;
+  filename: string;
+  size: string;
+  sha256: string | null;
+  created: string | null;
+  verified: boolean | null;
+  status: BackupStatus;
+};
+
+export type BackupFile = {
+  name: string;
+  size: number;
+  modified: number;
+};
+
+export type RestoreHistoryItem = {
+  id: number;
+  filename: string;
+  started: string | null;
+  completed: string | null;
+  status: BackupStatus;
 };
 
 // ---------- Topology types & synthesis ----------
