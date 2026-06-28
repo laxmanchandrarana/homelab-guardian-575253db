@@ -247,6 +247,9 @@ function ServiceDetailPage() {
   const start = useStartService();
   const stop = useStopService();
   const restart = useRestartServiceDirect();
+  const pause = usePauseService();
+  const resume = useResumeService();
+  const predictionQ = useServicePrediction(service);
 
   // fallback to list-derived row if detail endpoint doesn't exist
   const fallback = services.find((s) => s.name === service);
