@@ -172,6 +172,17 @@ export const endpoints = {
     api<{ ok: boolean }>(`/incidents/${encodeURIComponent(service)}`, { method: "POST" }),
   runScan: () => api<{ ok: boolean }>(`/scan`, { method: "POST" }),
   createBackup: () => api<{ ok: boolean }>(`/backup`, { method: "POST" }),
+  // Monitoring Explorer (Prometheus-style)
+  promQuery: (q: string) =>
+    api<{ data?: { result?: Array<{ metric?: Record<string, string>; value?: [number, string] }> } }>(
+      `/monitoring/prometheus/query?query=${encodeURIComponent(q)}`,
+    ),
+  promQueryRange: (q: string, range: RangeKey = "1h", step = 15) =>
+    api<{ data?: { result?: Array<{ metric?: Record<string, string>; values?: Array<[number, string]> }> } }>(
+      `/monitoring/prometheus/range?query=${encodeURIComponent(q)}&range=${range}&step=${step}`,
+    ),
+  monitoringHistory: (metric: string, range: RangeKey = "1h") =>
+    api<MetricsDTO>(`/monitoring/history?metric=${encodeURIComponent(metric)}&range=${range}`),
 };
 
 
