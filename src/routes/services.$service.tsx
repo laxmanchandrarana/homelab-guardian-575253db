@@ -28,6 +28,8 @@ import {
   Shield,
   History,
   X,
+  Trash2,
+
 } from "lucide-react";
 import {
   AreaChart,
