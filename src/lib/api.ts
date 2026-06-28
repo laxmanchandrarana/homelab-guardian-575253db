@@ -498,6 +498,9 @@ export const endpoints = {
     Promise.reject(new ApiError(501, "Pause not supported by backend")),
   resumeService: (_name: string) =>
     Promise.reject(new ApiError(501, "Resume not supported by backend")),
+  deleteService: (name: string) =>
+    api<{ ok: boolean }>(`/containers/${enc(name)}`, { method: "DELETE" }).then(() => ({ ok: true })),
+
 
   // Per-service: Phase 3.5 wrappers
   monitoringService: (name: string) =>

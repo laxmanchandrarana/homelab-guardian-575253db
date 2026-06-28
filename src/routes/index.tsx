@@ -443,9 +443,19 @@ function ServicesPreview() {
           <motion.div
             key={s.name}
             whileHover={{ y: -3 }}
-            className={`relative overflow-hidden rounded-lg border border-border bg-background/40 p-4 transition-shadow hover:${s.status === "healthy" ? "glow-success" : s.status === "warning" ? "glow-warning" : "glow-danger"}`}
+            onClick={() => navigate({ to: "/services/$service", params: { service: s.name } })}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                navigate({ to: "/services/$service", params: { service: s.name } });
+              }
+            }}
+            className={`relative cursor-pointer overflow-hidden rounded-lg border border-border bg-background/40 p-4 transition-shadow hover:${s.status === "healthy" ? "glow-success" : s.status === "warning" ? "glow-warning" : "glow-danger"}`}
           >
             <div className={`absolute inset-x-0 top-0 h-0.5 ${statusBg[s.status]}`} />
+
             <div className="flex items-start justify-between">
               <div>
                 <div className="font-medium">{s.name}</div>
@@ -457,13 +467,14 @@ function ServicesPreview() {
                   <span className="capitalize text-muted-foreground">{s.status === "healthy" ? "Running" : s.status}</span>
                 </div>
               </div>
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-[10px] text-muted-foreground">
+              <label onClick={(e) => e.stopPropagation()} className="inline-flex cursor-pointer items-center gap-1.5 text-[10px] text-muted-foreground">
                 <input type="checkbox" defaultChecked={s.autoHeal} className="peer sr-only" />
                 <span className="relative h-4 w-7 rounded-full bg-muted transition-colors peer-checked:bg-primary">
                   <span className="absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-foreground transition-transform peer-checked:translate-x-3" />
                 </span>
                 Auto
               </label>
+
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
               <div><div className="text-base font-medium text-foreground tabular-nums">{s.cpu}%</div>CPU</div>
@@ -473,21 +484,28 @@ function ServicesPreview() {
             {(s as any).lastRestart && (
               <div className="mt-2 text-[10px] text-muted-foreground">Last restart · {(s as any).lastRestart}</div>
             )}
-            <div className="mt-3 flex gap-1.5">
+            <div className="mt-3 flex gap-1.5" onClick={(e) => e.stopPropagation()}>
               <button
-                onClick={() => API_CONFIGURED && restart.mutate(s.name)}
+                onClick={(e) => { e.stopPropagation(); API_CONFIGURED && restart.mutate(s.name); }}
                 disabled={restart.isPending && restart.variables === s.name}
                 className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent disabled:opacity-50"
               >
                 <RotateCw className={`h-3 w-3 ${restart.isPending && restart.variables === s.name ? "animate-spin" : ""}`} /> Restart
               </button>
-              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate({ to: "/services/$service", params: { service: s.name } }); }}
+                className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent"
+              >
                 <FileText className="h-3 w-3" /> Logs
               </button>
-              <button className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent">
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate({ to: "/services/$service", params: { service: s.name } }); }}
+                className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 text-[11px] hover:bg-accent"
+              >
                 <BarChart3 className="h-3 w-3" /> Metrics
               </button>
             </div>
+
           </motion.div>
         ))}
       </div>

@@ -293,6 +293,18 @@ export const useRestartServiceDirect = makeServiceActionHook(endpoints.restartSe
 export const usePauseService = makeServiceActionHook(endpoints.pauseService, "pausing");
 export const useResumeService = makeServiceActionHook(endpoints.resumeService, "resuming");
 
+export function useDeleteService() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) => endpoints.deleteService(name),
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["services"] });
+      qc.invalidateQueries({ queryKey: ["service-detail"] });
+    },
+  });
+}
+
+
 export function useServicePrediction(name: string | null) {
   return useQuery({
     queryKey: ["service-prediction", name],

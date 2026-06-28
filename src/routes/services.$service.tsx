@@ -28,6 +28,8 @@ import {
   Shield,
   History,
   X,
+  Trash2,
+
 } from "lucide-react";
 import {
   AreaChart,
@@ -47,8 +49,19 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Switch } from "@/components/ui/switch";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
+
 import { cn } from "@/lib/utils";
 import {
   useServices,
@@ -59,13 +72,16 @@ import {
   useRestartServiceDirect,
   usePauseService,
   useResumeService,
+  useDeleteService,
   useServicePrediction,
   useMetrics,
   useIncidents,
 } from "@/hooks/useGuardianData";
 import { useGuardianSocket } from "@/hooks/useGuardianSocket";
+import { useServiceLiveStats } from "@/hooks/useServiceLiveStats";
 import type { RangeKey } from "@/lib/api";
 import { Sparkles, PauseCircle } from "lucide-react";
+
 
 export const Route = createFileRoute("/services/$service")({
   head: () => ({ meta: [{ title: "Service — Homelab Guardian" }] }),
@@ -251,6 +267,7 @@ function ServiceDetailPage() {
   const router = useRouter();
   const navigate = useNavigate();
   useGuardianSocket();
+  const { connected: liveStatsConnected } = useServiceLiveStats(service);
 
   const detailQ = useServiceDetail(service);
   const { services } = useServices();
@@ -260,7 +277,9 @@ function ServiceDetailPage() {
   const restart = useRestartServiceDirect();
   const pause = usePauseService();
   const resume = useResumeService();
+  const del = useDeleteService();
   const predictionQ = useServicePrediction(service);
+
 
   // fallback to list-derived row if detail endpoint doesn't exist
   const fallback = services.find((s) => s.name === service);
@@ -296,6 +315,7 @@ function ServiceDetailPage() {
   const scoreLabel = score >= 90 ? "Excellent" : score >= 70 ? "Good" : score >= 50 ? "Fair" : "Poor";
 
   const [logsOpen, setLogsOpen] = useState(false);
+  const [confirm, setConfirm] = useState<null | "stop" | "restart" | "delete">(null);
 
   const doAction = async (
     fn: { mutateAsync: (n: string) => Promise<unknown> },
@@ -308,6 +328,34 @@ function ServiceDetailPage() {
       toast.error(`${verb} failed: ${e?.message ?? "error"}`);
     }
   };
+
+  const doDelete = async () => {
+    try {
+      await del.mutateAsync(service);
+      toast.success(`Deleted ${service}`);
+      navigate({ to: "/services" });
+    } catch (e: any) {
+      toast.error(`Delete failed: ${e?.message ?? "error"}`);
+    }
+  };
+
+  const openExternal = () => {
+    const url = d.url ?? d.external_url ?? d.web_url;
+    if (typeof url === "string" && url) {
+      window.open(url, "_blank", "noopener,noreferrer");
+    } else {
+      toast.message("No external URL exposed for this service");
+    }
+  };
+
+  const onConfirm = () => {
+    const c = confirm;
+    setConfirm(null);
+    if (c === "stop") doAction(stop, "Stopped");
+    else if (c === "restart") doAction(restart, "Restarted");
+    else if (c === "delete") doDelete();
+  };
+
 
   return (
     <AppShell>
@@ -367,7 +415,14 @@ function ServiceDetailPage() {
                   {(d.lastRestart || d.last_restart) && (
                     <span>Last restart {String(d.lastRestart ?? d.last_restart)}</span>
                   )}
+                  {liveStatsConnected && (
+                    <Badge variant="outline" className="gap-1 text-[10px] border-emerald-500/40 text-emerald-300">
+                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      LIVE STATS
+                    </Badge>
+                  )}
                 </div>
+
               </div>
             </div>
 
@@ -375,7 +430,7 @@ function ServiceDetailPage() {
               <Button size="sm" variant="outline" onClick={() => doAction(start, "Started")} disabled={start.isPending}>
                 <Play className="size-3.5" /> Start
               </Button>
-              <Button size="sm" variant="outline" onClick={() => doAction(stop, "Stopped")} disabled={stop.isPending}>
+              <Button size="sm" variant="outline" onClick={() => setConfirm("stop")} disabled={stop.isPending}>
                 <Square className="size-3.5" /> Stop
               </Button>
               <Button size="sm" variant="outline" onClick={() => doAction(pause, "Paused")} disabled={pause.isPending}>
@@ -384,11 +439,22 @@ function ServiceDetailPage() {
               <Button size="sm" variant="outline" onClick={() => doAction(resume, "Resumed")} disabled={resume.isPending}>
                 <PlayCircle className="size-3.5" /> Resume
               </Button>
-              <Button size="sm" onClick={() => doAction(restart, "Restarted")} disabled={restart.isPending}>
+              <Button size="sm" onClick={() => setConfirm("restart")} disabled={restart.isPending}>
                 <RotateCw className={cn("size-3.5", restart.isPending && "animate-spin")} /> Restart
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setLogsOpen(true)}>
                 <Terminal className="size-3.5" /> Logs
+              </Button>
+              <Button size="sm" variant="ghost" onClick={openExternal}>
+                <ExternalLink className="size-3.5" /> Open
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setConfirm("delete")}
+                disabled={del.isPending}
+              >
+                <Trash2 className="size-3.5" /> Delete
               </Button>
               {(d.container_id || d.id) && (
                 <Button size="sm" variant="ghost" onClick={() => copyText(String(d.container_id ?? d.id), "Container ID")}>
@@ -402,13 +468,6 @@ function ServiceDetailPage() {
               >
                 <Copy className="size-3.5" /> docker
               </Button>
-              {d.url && (
-                <a href={d.url} target="_blank" rel="noreferrer">
-                  <Button size="sm" variant="ghost">
-                    <ExternalLink className="size-3.5" /> Open
-                  </Button>
-                </a>
-              )}
               {d.portainer_url && (
                 <a href={d.portainer_url} target="_blank" rel="noreferrer">
                   <Button size="sm" variant="ghost">
@@ -417,6 +476,7 @@ function ServiceDetailPage() {
                 </a>
               )}
             </div>
+
           </div>
         </Card>
 
@@ -577,6 +637,37 @@ function ServiceDetailPage() {
       </div>
 
       <LogsDrawer open={logsOpen} onClose={() => setLogsOpen(false)} service={service} />
+
+      <AlertDialog open={!!confirm} onOpenChange={(o) => !o && setConfirm(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {confirm === "delete"
+                ? `Delete ${service}?`
+                : confirm === "stop"
+                  ? `Stop ${service}?`
+                  : `Restart ${service}?`}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirm === "delete"
+                ? "This permanently removes the container. Volumes may persist depending on your Docker config. This action cannot be undone."
+                : confirm === "stop"
+                  ? "This will stop the container. Dependent services may break until it's started again."
+                  : "The container will briefly be unavailable while it restarts."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={onConfirm}
+              className={confirm === "delete" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : undefined}
+            >
+              {confirm === "delete" ? "Delete" : "Confirm"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </AppShell>
   );
 }
