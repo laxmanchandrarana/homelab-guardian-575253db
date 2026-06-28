@@ -14,9 +14,10 @@ import { HealthRing } from "@/components/HealthRing";
 import { topMetrics as mockTopMetrics, liveEvents as fallbackEvents, infraNodes, guardianInsights, type Status } from "@/lib/mock-data";
 import {
   useMonitoring, useServices, useIncidents, useNotifications, useMetrics, useAiSummary,
-  useAlerts, useRestartService, useRunScan, useCreateBackup,
+  useAlerts, useRestartService, useRunScan, useCreateBackup, useBackupSummary,
 } from "@/hooks/useGuardianData";
 import { API_CONFIGURED } from "@/lib/api";
+
 import * as Icons from "lucide-react";
 import { useEffect, useState } from "react";
 
