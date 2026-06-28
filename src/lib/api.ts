@@ -36,7 +36,7 @@ export async function api<T = unknown>(path: string, options: RequestInit = {}):
   return (text ? JSON.parse(text) : (undefined as unknown)) as T;
 }
 
-export type RangeKey = "15m" | "1h" | "6h" | "24h";
+export type RangeKey = "15m" | "1h" | "6h" | "24h" | "7d";
 
 
 // Derive WS URL from API_URL (http -> ws, https -> wss).
