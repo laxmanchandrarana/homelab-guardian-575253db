@@ -789,6 +789,42 @@ function PerformanceScore({ score, label }: { score: number; label: string }) {
   );
 }
 
+function PredictionCard({ data, isLoading }: { data: any; isLoading: boolean }) {
+  const risk = String(data?.risk ?? "").toLowerCase();
+  const riskTone =
+    risk === "high" || risk === "critical" ? "text-rose-300 border-rose-500/40" :
+    risk === "medium" || risk === "warning" ? "text-amber-300 border-amber-500/40" :
+    risk ? "text-emerald-300 border-emerald-500/40" : "text-muted-foreground";
+  return (
+    <Card>
+      <SectionHeader icon={Sparkles} title="Guardian AI Prediction" />
+      {isLoading ? (
+        <Skeleton className="h-16 w-full" />
+      ) : !data ? (
+        <div className="text-xs text-muted-foreground italic">No prediction available yet.</div>
+      ) : (
+        <div className="space-y-2">
+          {data.risk && (
+            <Badge variant="outline" className={cn("gap-1 text-[10px]", riskTone)}>
+              Risk: {data.risk}
+              {typeof data.confidence === "number" && <span className="opacity-70">· {Math.round(data.confidence * 100)}%</span>}
+            </Badge>
+          )}
+          {data.summary && <p className="text-xs leading-relaxed">{data.summary}</p>}
+          {data.next_event && <InfoRow label="Next Event" value={data.next_event} />}
+          {data.recommendation && (
+            <div className="text-xs p-2 rounded-lg bg-primary/5 border border-primary/20">
+              <span className="text-primary font-medium">Recommended: </span>{data.recommendation}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+
+
 // ────────────────────────────── Logs Drawer ──────────────────────────────
 
 function LogsDrawer({ open, onClose, service }: { open: boolean; onClose: () => void; service: string }) {
