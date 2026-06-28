@@ -608,7 +608,7 @@ function HistoryCharts() {
           )}
         </div>
         <div className="flex gap-1">
-          {(["1h", "6h", "24h"] as RangeKey[]).map((r) => (
+          {(["15m", "1h", "6h", "24h", "7d"] as RangeKey[]).map((r) => (
             <Button
               key={r}
               size="sm"
