@@ -338,6 +338,11 @@ function ServiceDetailPage() {
                         <Heart className="size-3" /> {String(d.health)}
                       </Badge>
                     )}
+                    {(d.autoHeal ?? d.autoheal) && (
+                      <Badge variant="outline" className="gap-1 text-xs border-emerald-500/40 text-emerald-300">
+                        <Shield className="size-3" /> Auto-Heal
+                      </Badge>
+                    )}
                   </div>
                 )}
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -362,12 +367,37 @@ function ServiceDetailPage() {
               <Button size="sm" variant="outline" onClick={() => doAction(stop, "Stopped")} disabled={stop.isPending}>
                 <Square className="size-3.5" /> Stop
               </Button>
+              <Button size="sm" variant="outline" onClick={() => doAction(pause, "Paused")} disabled={pause.isPending}>
+                <PauseCircle className="size-3.5" /> Pause
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => doAction(resume, "Resumed")} disabled={resume.isPending}>
+                <PlayCircle className="size-3.5" /> Resume
+              </Button>
               <Button size="sm" onClick={() => doAction(restart, "Restarted")} disabled={restart.isPending}>
                 <RotateCw className={cn("size-3.5", restart.isPending && "animate-spin")} /> Restart
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setLogsOpen(true)}>
                 <Terminal className="size-3.5" /> Logs
               </Button>
+              {(d.container_id || d.id) && (
+                <Button size="sm" variant="ghost" onClick={() => copyText(String(d.container_id ?? d.id), "Container ID")}>
+                  <Copy className="size-3.5" /> ID
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => copyText(`docker restart ${d.container_name ?? service}`, "Docker command")}
+              >
+                <Copy className="size-3.5" /> docker
+              </Button>
+              {d.url && (
+                <a href={d.url} target="_blank" rel="noreferrer">
+                  <Button size="sm" variant="ghost">
+                    <ExternalLink className="size-3.5" /> Open
+                  </Button>
+                </a>
+              )}
               {d.portainer_url && (
                 <a href={d.portainer_url} target="_blank" rel="noreferrer">
                   <Button size="sm" variant="ghost">
@@ -378,6 +408,22 @@ function ServiceDetailPage() {
             </div>
           </div>
         </Card>
+
+        {/* Health Summary KPI strip */}
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
+          <KpiCard label="Status" value={tone.label} tone={tone.text} />
+          <KpiCard label="CPU" value={`${Math.round(cpu)}%`} />
+          <KpiCard label="Memory" value={`${Math.round(mem)}%`} sub={d.memory_limit ? `of ${d.memory_limit}` : undefined} />
+          <KpiCard label="Disk" value={`${Math.round(disk)}%`} />
+          <KpiCard label="Net RX" value={`${netRx.toFixed(1)} MB/s`} />
+          <KpiCard label="Net TX" value={`${netTx.toFixed(1)} MB/s`} />
+          <KpiCard label="Uptime" value={d.uptime ?? "—"} />
+          <KpiCard label="Restarts" value={String(d.restart_count ?? d.restarts ?? 0)} />
+          <KpiCard label="Image" value={d.image?.split(":")[0] ?? "—"} mono />
+          <KpiCard label="Tag" value={d.image_tag ?? d.image?.split(":")[1] ?? "latest"} mono />
+          <KpiCard label="Container" value={String(d.container_id ?? d.id ?? "—").slice(0, 12)} mono />
+          <KpiCard label="Updated" value={d.last_update ?? d.last_check ?? "—"} />
+        </div>
 
         {/* Gauges */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
