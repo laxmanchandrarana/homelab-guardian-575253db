@@ -395,4 +395,53 @@ export function useBackupSummary() {
   };
 }
 
+export function useAutomationSummary() {
+  const rulesQ = useQuery({
+    queryKey: ["automation-rules"],
+    queryFn: endpoints.automationRules,
+    enabled: API_CONFIGURED,
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+  const jobsQ = useQuery({
+    queryKey: ["automation-jobs"],
+    queryFn: endpoints.automationJobs,
+    enabled: API_CONFIGURED,
+    refetchInterval: 10_000,
+    retry: 1,
+  });
+  const metricsQ = useQuery({
+    queryKey: ["automation-metrics"],
+    queryFn: endpoints.automationMetrics,
+    enabled: API_CONFIGURED,
+    refetchInterval: 30_000,
+    retry: 1,
+  });
+
+  const rules = rulesQ.data ?? [];
+  const jobs = jobsQ.data ?? [];
+  const metrics = metricsQ.data;
+  const today = new Date().toDateString();
+
+  return {
+    totalRules: rules.length,
+    enabledRules: rules.filter((r) => r.enabled).length,
+    pendingJobs: jobs.filter((j) => j.status === "running" || j.status === "pending").length,
+    recoveriesToday: jobs.filter((j) => j.started && new Date(j.started).toDateString() === today).length,
+    failedToday: jobs.filter((j) => j.status === "failed" && j.started && new Date(j.started).toDateString() === today).length,
+    successRate: metrics?.success_rate ?? null,
+    avgRecoverySeconds: metrics?.avg_recovery_seconds ?? null,
+    failuresToday: metrics?.failures_today ?? null,
+    isLoading: rulesQ.isLoading || jobsQ.isLoading || metricsQ.isLoading,
+    isLive: !!rulesQ.data || !!jobsQ.data || !!metricsQ.data,
+    error: rulesQ.error || jobsQ.error || metricsQ.error,
+    refetch: () => {
+      rulesQ.refetch();
+      jobsQ.refetch();
+      metricsQ.refetch();
+    },
+  };
+}
+
+
 
