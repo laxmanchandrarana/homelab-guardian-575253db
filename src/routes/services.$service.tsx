@@ -241,6 +241,8 @@ function KpiCard({ label, value, sub, mono, tone }: { label: string; value: Reac
       {sub && <div className="text-[10px] text-muted-foreground truncate">{sub}</div>}
     </Card>
   );
+}
+
 
 // ────────────────────────────── page ──────────────────────────────
 
