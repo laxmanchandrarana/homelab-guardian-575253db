@@ -443,9 +443,19 @@ function ServicesPreview() {
           <motion.div
             key={s.name}
             whileHover={{ y: -3 }}
-            className={`relative overflow-hidden rounded-lg border border-border bg-background/40 p-4 transition-shadow hover:${s.status === "healthy" ? "glow-success" : s.status === "warning" ? "glow-warning" : "glow-danger"}`}
+            onClick={() => navigate({ to: "/services/$service", params: { service: s.name } })}
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                navigate({ to: "/services/$service", params: { service: s.name } });
+              }
+            }}
+            className={`relative cursor-pointer overflow-hidden rounded-lg border border-border bg-background/40 p-4 transition-shadow hover:${s.status === "healthy" ? "glow-success" : s.status === "warning" ? "glow-warning" : "glow-danger"}`}
           >
             <div className={`absolute inset-x-0 top-0 h-0.5 ${statusBg[s.status]}`} />
+
             <div className="flex items-start justify-between">
               <div>
                 <div className="font-medium">{s.name}</div>
