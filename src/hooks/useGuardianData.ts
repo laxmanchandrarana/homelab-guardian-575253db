@@ -190,7 +190,7 @@ function toSeries(points: MetricPoint[] | undefined, fallback: { t: number; v: n
   return points.slice(-96).map((p, i) => ({ t: i, v: Math.max(0, Math.min(100, Number(p.v) || 0)) }));
 }
 
-const RANGE_POINTS: Record<RangeKey, number> = { "15m": 15, "1h": 48, "6h": 72, "24h": 96 };
+const RANGE_POINTS: Record<RangeKey, number> = { "15m": 15, "1h": 48, "6h": 72, "24h": 96, "7d": 168 };
 
 export function useMetrics(range: RangeKey = "1h") {
   const q = useQuery<MetricsDTO>({
