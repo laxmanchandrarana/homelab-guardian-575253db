@@ -860,6 +860,65 @@ function fmtBytes(n: number) {
   return `${v.toFixed(v >= 10 ? 0 : 1)} ${units[i]}`;
 }
 
+function fmtDuration(sec: number | null | undefined) {
+  if (sec == null) return "—";
+  if (sec < 60) return `${sec}s`;
+  return `${Math.floor(sec / 60)}m ${sec % 60}s`;
+}
+
+function AutomationSummary() {
+  const navigate = useNavigate();
+  const { totalRules, enabledRules, pendingJobs, recoveriesToday, successRate, avgRecoverySeconds, failuresToday, isLoading, error, refetch } = useAutomationSummary();
+
+  return (
+    <section className="surface-card p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Zap className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Automation</h3>
+          {pendingJobs > 0 && (
+            <span className="rounded-full bg-warning/15 px-2 py-0.5 text-[10px] font-medium text-warning ring-1 ring-warning/30">
+              {pendingJobs} running
+            </span>
+          )}
+        </div>
+        <button onClick={() => navigate({ to: "/automation" })} className="text-xs text-primary hover:underline">
+          Open automation center
+        </button>
+      </div>
+      {isLoading && totalRules === 0 ? (
+        <SkeletonRows n={2} />
+      ) : error ? (
+        <ErrorCard message="Couldn't load automation data" onRetry={() => refetch()} />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="Rules" value={`${enabledRules}/${totalRules}`} />
+            <Stat label="Success rate" value={successRate == null ? "—" : `${Math.round(successRate)}%`} />
+            <Stat label="Avg recovery" value={fmtDuration(avgRecoverySeconds)} />
+            <Stat label="Failures today" value={String(failuresToday ?? 0)} />
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-3 py-2 text-xs">
+            <div className="min-w-0 truncate text-muted-foreground">
+              {recoveriesToday > 0 ? (
+                <><span className="text-foreground">{recoveriesToday}</span> recoveries today</>
+              ) : (
+                "No recoveries today"
+              )}
+            </div>
+            <button
+              onClick={() => navigate({ to: "/automation" })}
+              className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 hover:bg-accent"
+            >
+              View all <ArrowRight className="h-3 w-3" />
+            </button>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
 function BackupSummary() {
   const navigate = useNavigate();
   const { count, latest, totalBytes, successRate, isLoading, error, refetch } = useBackupSummary();
