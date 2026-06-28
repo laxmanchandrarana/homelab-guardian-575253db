@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { endpoints } from "@/lib/api";
 import { API_CONFIGURED } from "@/config/api";
 
@@ -23,10 +23,13 @@ export function useOnline(): boolean {
 
 /**
  * Pings `/health` every 15s to monitor backend reachability.
- * Returns `online: false` when the backend cannot be reached.
+ * Also treats the backend as online whenever any other Guardian query
+ * has succeeded recently — this avoids false "offline" banners when the
+ * `/health` endpoint is blocked by CORS but the rest of the API works.
  */
 export function useBackendStatus() {
   const browserOnline = useOnline();
+  const qc = useQueryClient();
   const q = useQuery({
     queryKey: ["backend-health"],
     queryFn: () => endpoints.health(),
@@ -37,9 +40,31 @@ export function useBackendStatus() {
     staleTime: 10_000,
   });
 
+  const healthOk = !!q.data && !q.isError;
+
+  // Re-render every 10s so the "recent success" check stays fresh.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 10_000);
+    return () => clearInterval(id);
+  }, []);
+
+  const recentlySucceeded = (() => {
+    const cutoff = Date.now() - 45_000;
+    return qc
+      .getQueryCache()
+      .getAll()
+      .some((entry) => {
+        const key = entry.queryKey?.[0];
+        if (key === "backend-health") return false;
+        const s = entry.state;
+        return s.status === "success" && s.dataUpdatedAt > cutoff;
+      });
+  })();
+
   return {
     browserOnline,
-    backendOnline: !!q.data && !q.isError,
+    backendOnline: healthOk || recentlySucceeded,
     isChecking: q.isFetching,
     lastChecked: q.dataUpdatedAt,
     refresh: q.refetch,
