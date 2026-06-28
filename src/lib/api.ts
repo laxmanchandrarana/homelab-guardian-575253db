@@ -1,58 +1,158 @@
 // Central API client for the Guardian FastAPI backend.
-// Set VITE_API_URL in your environment (e.g. http://100.93.15.3:8008).
-// When VITE_API_URL is unset, callers should fall back to mock data.
+//
+// This module is the ONLY place that talks to HTTP. Components and hooks
+// must use the typed `endpoints.*` helpers below. The shapes returned here
+// are normalized DTOs — backend response drift is contained in this file.
 
-const DEFAULT_API_URL = "https://api-guardian.atmakriti.com";
-export const API_URL: string =
-  ((import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "") || DEFAULT_API_URL;
+import {
+  API_BASE_URL,
+  API_CONFIGURED,
+  IS_DEV,
+  deriveWsUrl,
+} from "@/config/api";
 
-export const API_CONFIGURED = API_URL.length > 0;
+export const API_URL = API_BASE_URL;
+export { API_CONFIGURED };
+
+// ---------- Errors ----------
 
 export class ApiError extends Error {
   status: number;
   body: string;
-  constructor(status: number, body: string) {
-    super(`API ${status}: ${body || "request failed"}`);
+  url: string;
+  constructor(status: number, body: string, url = "") {
+    super(`API ${status} ${url}: ${body || "request failed"}`);
     this.status = status;
     this.body = body;
+    this.url = url;
   }
 }
 
-export async function api<T = unknown>(path: string, options: RequestInit = {}): Promise<T> {
-  if (!API_CONFIGURED) {
-    throw new ApiError(0, "VITE_API_URL is not configured");
-  }
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers ?? {}),
-    },
-    ...options,
-  });
-  if (!res.ok) {
-    throw new ApiError(res.status, await res.text().catch(() => ""));
-  }
-  const text = await res.text();
-  return (text ? JSON.parse(text) : (undefined as unknown)) as T;
+// ---------- Core request helper (retry + logging) ----------
+
+type RequestOptions = RequestInit & {
+  /** Disable retry even for idempotent GET. */
+  noRetry?: boolean;
+  /** Override retry count for this request (default 3 for GET, 0 for others). */
+  retries?: number;
+  /** Per-request timeout in ms. */
+  timeoutMs?: number;
+};
+
+const DEFAULT_TIMEOUT = 15_000;
+const RETRYABLE_STATUS = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+function backoff(attempt: number): number {
+  // 250ms, 500ms, 1s, 2s … capped at 4s with small jitter.
+  const base = Math.min(250 * 2 ** attempt, 4000);
+  return base + Math.floor(Math.random() * 150);
 }
+
+function sleep(ms: number) {
+  return new Promise<void>((r) => setTimeout(r, ms));
+}
+
+function safeRedact(input: unknown): unknown {
+  if (!input) return input;
+  if (typeof input === "string") {
+    // Strip anything that looks like a bearer/token/key.
+    return input.replace(/(Bearer\s+[A-Za-z0-9._-]+)/gi, "Bearer ***");
+  }
+  if (typeof input === "object") {
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(input as Record<string, unknown>)) {
+      if (/token|secret|password|api[-_]?key|authorization/i.test(k)) out[k] = "***";
+      else out[k] = v;
+    }
+    return out;
+  }
+  return input;
+}
+
+function logRequest(url: string, init: RequestInit, status: number, ms: number, errored: boolean) {
+  if (!IS_DEV) return;
+  const method = (init.method ?? "GET").toUpperCase();
+  const tag = errored ? "%c[api]%c ✖" : "%c[api]%c ✓";
+  // eslint-disable-next-line no-console
+  console.debug(
+    `${tag} ${method} ${url} → ${status} in ${ms}ms`,
+    "color:#7dd3fc;font-weight:600",
+    "color:inherit",
+  );
+}
+
+export async function api<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
+  if (!API_CONFIGURED) throw new ApiError(0, "API base URL is not configured");
+
+  const url = `${API_URL}${path}`;
+  const method = (options.method ?? "GET").toUpperCase();
+  const isIdempotent = method === "GET" || method === "HEAD";
+  const maxAttempts = options.noRetry
+    ? 1
+    : Math.max(1, options.retries ?? (isIdempotent ? 3 : 1));
+
+  let lastErr: unknown;
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs ?? DEFAULT_TIMEOUT);
+    const t0 = performance.now();
+    try {
+      const res = await fetch(url, {
+        ...options,
+        signal: options.signal ?? controller.signal,
+        headers: {
+          Accept: "application/json",
+          ...(options.body ? { "Content-Type": "application/json" } : {}),
+          ...(options.headers ?? {}),
+        },
+      });
+      const ms = Math.round(performance.now() - t0);
+      logRequest(url, options, res.status, ms, !res.ok);
+
+      if (!res.ok) {
+        if (isIdempotent && RETRYABLE_STATUS.has(res.status) && attempt + 1 < maxAttempts) {
+          await sleep(backoff(attempt));
+          continue;
+        }
+        const body = await res.text().catch(() => "");
+        throw new ApiError(res.status, body, url);
+      }
+      const text = await res.text();
+      if (!text) return undefined as T;
+      try {
+        return JSON.parse(text) as T;
+      } catch {
+        // Some endpoints (logs) return raw text.
+        return text as unknown as T;
+      }
+    } catch (err) {
+      lastErr = err;
+      const ms = Math.round(performance.now() - t0);
+      logRequest(url, options, 0, ms, true);
+      const isAbort = (err as { name?: string })?.name === "AbortError";
+      const retryable = isIdempotent && !(err instanceof ApiError);
+      if (retryable && attempt + 1 < maxAttempts && !isAbort) {
+        await sleep(backoff(attempt));
+        continue;
+      }
+      if (err instanceof ApiError) throw err;
+      throw new ApiError(0, (err as Error)?.message ?? "Network error", url);
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new ApiError(0, "Request failed", url);
+}
+
+// ---------- WS URL helper (kept for back-compat) ----------
+
+export function wsUrl(path = "/ws"): string | null {
+  return deriveWsUrl(path);
+}
+
+// ---------- Public DTO types consumed by hooks/components ----------
 
 export type RangeKey = "15m" | "1h" | "6h" | "24h" | "7d";
-
-
-// Derive WS URL from API_URL (http -> ws, https -> wss).
-export function wsUrl(path = "/ws"): string | null {
-  if (!API_CONFIGURED) return null;
-  try {
-    const u = new URL(API_URL);
-    u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
-    u.pathname = (u.pathname.replace(/\/$/, "") + path) || path;
-    return u.toString();
-  } catch {
-    return null;
-  }
-}
-
-// ---------- Endpoint helpers (typed against your FastAPI shape) ----------
 
 export type MonitoringDTO = {
   cpu: number;
@@ -104,7 +204,6 @@ export type ServiceDetailDTO = ServiceDTO & {
   created_at?: string;
 };
 
-
 export type IncidentDTO = {
   id?: string | number;
   service: string;
@@ -152,44 +251,336 @@ export type AiSummaryDTO = {
   incidents_open?: number;
 };
 
+// ---------- Tiny normalizer helpers ----------
+
+const num = (v: unknown, d = 0): number => {
+  if (typeof v === "number" && Number.isFinite(v)) return v;
+  if (typeof v === "string") {
+    const n = parseFloat(v);
+    return Number.isFinite(n) ? n : d;
+  }
+  return d;
+};
+const str = (v: unknown, d = ""): string => (typeof v === "string" ? v : v == null ? d : String(v));
+const arr = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+function pickMemoryPercent(mem: unknown): number {
+  if (typeof mem === "number") return mem;
+  if (mem && typeof mem === "object") {
+    const m = mem as Record<string, unknown>;
+    if (typeof m.percent === "number") return m.percent;
+    const used = num(m.used);
+    const total = num(m.total);
+    if (total > 0) return (used / total) * 100;
+  }
+  return 0;
+}
+
+function pickDiskPercent(disk: unknown): number {
+  if (typeof disk === "number") return disk;
+  if (disk && typeof disk === "object") {
+    const d = disk as Record<string, unknown>;
+    if (typeof d.percent === "number") return d.percent;
+    const used = num(d.used);
+    const total = num(d.total);
+    if (total > 0) return (used / total) * 100;
+  }
+  return 0;
+}
+
+function normalizeContainer(raw: unknown): ServiceDTO {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const image = Array.isArray(r.image)
+    ? (r.image[0] as string | undefined)
+    : (r.image as string | undefined);
+  return {
+    name: str(r.name, "unknown"),
+    status: str(r.status, "unknown"),
+    cpu: num(r.cpu, 0),
+    memory: typeof r.memory === "number" || typeof r.memory === "string" ? (r.memory as number | string) : 0,
+    uptime: str(r.uptime) || undefined,
+    autoheal: Boolean(r.autoheal ?? r.autoHeal ?? false),
+    autoHeal: Boolean(r.autoheal ?? r.autoHeal ?? false),
+    health: str(r.health) || undefined,
+    container_name: str(r.container_name ?? r.name) || undefined,
+    image,
+    restart_count: typeof r.restart_count === "number" ? r.restart_count : undefined,
+  };
+}
+
+function normalizeIncident(raw: unknown): IncidentDTO {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const sev = str(r.severity).toUpperCase();
+  const healed = str(r.healed).toUpperCase() === "YES" || str(r.status).toLowerCase() === "resolved";
+  const severity: IncidentDTO["severity"] = healed
+    ? "resolved"
+    : sev === "CRITICAL"
+      ? "critical"
+      : sev === "WARNING"
+        ? "warning"
+        : "info";
+  return {
+    id: (r.id as string | number | undefined) ?? undefined,
+    service: str(r.service, "unknown"),
+    status: healed ? "resolved" : sev.toLowerCase() || str(r.status, "open"),
+    time: str(r.created ?? r.time ?? r.timestamp, new Date().toISOString()),
+    detail: str(r.message ?? r.detail) || undefined,
+    severity,
+  };
+}
+
+function normalizePromAlert(raw: unknown): AlertDTO {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  const labels = (r.labels ?? {}) as Record<string, string>;
+  const annotations = (r.annotations ?? {}) as Record<string, string>;
+  const sev = (labels.severity ?? "").toLowerCase();
+  return {
+    id: labels.alertname ?? str(r.fingerprint) ?? undefined,
+    severity: sev === "critical" ? "critical" : sev === "warning" ? "warning" : "info",
+    service:
+      labels.service ??
+      labels.container_label_com_docker_compose_service ??
+      labels.job ??
+      "system",
+    message: annotations.description ?? annotations.summary ?? labels.alertname ?? "Alert firing",
+    started: str(r.activeAt ?? r.startsAt) || undefined,
+  };
+}
+
+function normalizeHealth(raw: unknown): MonitoringDTO {
+  const r = (raw ?? {}) as Record<string, unknown>;
+  return {
+    cpu: num(r.cpu, 0),
+    memory: pickMemoryPercent(r.memory),
+    disk: pickDiskPercent(r.disk),
+    network: "—",
+    status: "healthy",
+    last_update: new Date().toISOString(),
+  };
+}
+
+// ---------- Synthesis helpers (when backend lacks an endpoint) ----------
+
+async function synthesizeMonitoring(): Promise<MonitoringDTO> {
+  const [health, containers, incidents] = await Promise.allSettled([
+    api<unknown>("/health"),
+    api<unknown[]>("/containers"),
+    api<unknown[]>("/incidents"),
+  ]);
+  const base: MonitoringDTO =
+    health.status === "fulfilled" ? normalizeHealth(health.value) : { cpu: 0, memory: 0, disk: 0, network: "—" };
+  const services = containers.status === "fulfilled" ? arr<unknown>(containers.value).map(normalizeContainer) : [];
+  const incs = incidents.status === "fulfilled" ? arr<unknown>(incidents.value).map(normalizeIncident) : [];
+  const healthy = services.filter((s) => s.status.toLowerCase() === "running").length;
+  const down = services.length - healthy;
+  const open = incs.filter((i) => i.severity !== "resolved").length;
+  const score = Math.max(
+    0,
+    Math.min(100, Math.round(100 - (down * 8 + open * 4 + base.cpu * 0.2 + base.memory * 0.2))),
+  );
+  return {
+    ...base,
+    containers_total: services.length,
+    healthy_services: healthy,
+    down_services: down,
+    health_score: score,
+  };
+}
+
+function synthesizeNotificationsFromIncidents(incidents: IncidentDTO[]): NotificationDTO[] {
+  return incidents.slice(0, 20).map((i) => ({
+    id: i.id,
+    time: i.time,
+    text: `${i.service}: ${i.detail ?? i.status}`,
+    level:
+      i.severity === "critical"
+        ? "danger"
+        : i.severity === "warning"
+          ? "warning"
+          : i.severity === "resolved"
+            ? "healthy"
+            : "info",
+    channel: "system",
+    status: "delivered",
+  }));
+}
+
+async function synthesizeAiSummary(): Promise<AiSummaryDTO> {
+  const mon = await synthesizeMonitoring().catch(
+    () => ({ healthy_services: 0, down_services: 0, health_score: 0 }) as MonitoringDTO,
+  );
+  const incidents =
+    (await api<unknown[]>("/incidents").catch(() => [])) ?? [];
+  const incs = arr<unknown>(incidents).map(normalizeIncident);
+  const open = incs.filter((i) => i.severity !== "resolved").length;
+  const recovered = incs.filter(
+    (i) =>
+      i.severity === "resolved" &&
+      Date.now() - new Date(i.time).getTime() < 24 * 3600 * 1000,
+  ).length;
+  const healthy = mon.healthy_services ?? 0;
+  const down = mon.down_services ?? 0;
+  let summary = `All systems nominal — ${healthy} services healthy.`;
+  let recommendation = "No action required.";
+  if (down > 0) {
+    summary = `${down} service${down === 1 ? "" : "s"} need attention.`;
+    recommendation = "Investigate failing containers and review recent incidents.";
+  } else if (open > 0) {
+    summary = `${open} open incident${open === 1 ? "" : "s"} being tracked.`;
+    recommendation = "Review active incidents in the Incident Center.";
+  }
+  return {
+    summary,
+    recommendation,
+    risks: down > 0 ? ["Service downtime"] : [],
+    status: down > 0 ? "degraded" : "healthy",
+    healthy_services: healthy,
+    recovered_today: recovered,
+    incidents_open: open,
+  };
+}
+
+// ---------- Endpoint helpers ----------
+
+const enc = encodeURIComponent;
+
 export const endpoints = {
-  monitoring: () => api<MonitoringDTO>("/monitoring"),
-  dashboard: () => api<DashboardDTO>("/dashboard"),
-  services: () => api<ServiceDTO[]>("/services"),
-  serviceDetail: (name: string) => api<ServiceDetailDTO>(`/services/${encodeURIComponent(name)}`),
-  serviceLogs: (name: string) => api<string | { logs?: string; lines?: string[] }>(`/services/${encodeURIComponent(name)}/logs`),
-  startService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/start`, { method: "POST" }),
-  stopService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/stop`, { method: "POST" }),
-  restartServiceDirect: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/restart`, { method: "POST" }),
-  pauseService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/pause`, { method: "POST" }),
-  resumeService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/resume`, { method: "POST" }),
-  // Phase 3.5 — service-scoped wrappers (gracefully optional on the backend)
-  monitoringService: (name: string) => api<ServiceDetailDTO & Record<string, unknown>>(`/monitoring/service/${encodeURIComponent(name)}`),
-  serviceMetrics: (name: string, range: RangeKey = "1h") => api<MetricsDTO>(`/metrics/${encodeURIComponent(name)}?range=${range}`),
-  servicePrediction: (name: string) => api<{ risk?: string; confidence?: number; next_event?: string; recommendation?: string; summary?: string }>(`/prediction/${encodeURIComponent(name)}`),
-  serviceLogsScoped: (name: string) => api<string | { logs?: string; lines?: string[] }>(`/logs/${encodeURIComponent(name)}`),
-  incidents: () => api<IncidentDTO[]>("/incidents"),
-  incidentDetail: (id: string | number) => api<IncidentDTO & Record<string, unknown>>(`/incidents/${encodeURIComponent(String(id))}`),
-  metrics: (range?: RangeKey) => api<MetricsDTO>(`/metrics${range ? `?range=${range}` : ""}`),
-  notifications: () => api<NotificationDTO[]>("/notifications"),
-  alerts: () => api<AlertDTO[]>("/alerts"),
-  aiSummary: () => api<AiSummaryDTO>("/ai/summary"),
-  health: () => api<{ status: string }>("/health"),
+  // System health → KPI cards
+  monitoring: () => synthesizeMonitoring(),
+  dashboard: () => synthesizeMonitoring() as Promise<DashboardDTO>,
+  health: () => api<{ status?: string } | unknown>("/health"),
+
+  // Containers → service grid
+  services: async (): Promise<ServiceDTO[]> => {
+    const list = await api<unknown[]>("/containers");
+    return arr<unknown>(list).map(normalizeContainer);
+  },
+  serviceDetail: async (name: string): Promise<ServiceDetailDTO> => {
+    const [meta, stats] = await Promise.allSettled([
+      api<unknown>(`/containers/${enc(name)}`).catch(() => null),
+      api<unknown>(`/inspect/${enc(name)}`),
+    ]);
+    const base = normalizeContainer(meta.status === "fulfilled" && meta.value ? meta.value : { name });
+    const inspect =
+      stats.status === "fulfilled" ? (stats.value as Record<string, unknown> | null) : null;
+    const detail: ServiceDetailDTO = { ...base };
+    if (inspect) {
+      const state = (inspect.State ?? {}) as Record<string, unknown>;
+      const config = (inspect.Config ?? {}) as Record<string, unknown>;
+      const networkSettings = (inspect.NetworkSettings ?? {}) as Record<string, unknown>;
+      const networks = (networkSettings.Networks ?? {}) as Record<string, unknown>;
+      const mounts = arr<Record<string, unknown>>(inspect.Mounts);
+      const ports = networkSettings.Ports as Record<string, unknown> | undefined;
+      detail.status = str(state.Status, detail.status);
+      detail.health =
+        (state.Health as Record<string, string> | undefined)?.Status ?? detail.health;
+      detail.created = str(inspect.Created) || undefined;
+      detail.image = str((config as Record<string, unknown>).Image) || detail.image;
+      detail.networks = Object.keys(networks);
+      detail.volumes = mounts.map((m) => ({
+        source: str(m.Source),
+        target: str(m.Destination),
+      }));
+      detail.env = arr<string>(config.Env) as string[];
+      detail.ports = ports ? Object.keys(ports) : [];
+      detail.restart_count = num((inspect as Record<string, unknown>).RestartCount, 0);
+    }
+    return detail;
+  },
+  serviceLogs: (name: string) => api<string>(`/logs/${enc(name)}`),
+  startService: (name: string) =>
+    api<{ ok: boolean }>(`/start/${enc(name)}`, { method: "POST" }).then(() => ({ ok: true })),
+  stopService: (name: string) =>
+    api<{ ok: boolean }>(`/stop/${enc(name)}`, { method: "POST" }).then(() => ({ ok: true })),
+  restartServiceDirect: (name: string) =>
+    api<{ ok: boolean }>(`/restart/${enc(name)}`, { method: "POST" }).then(() => ({ ok: true })),
+  pauseService: (_name: string) =>
+    Promise.reject(new ApiError(501, "Pause not supported by backend")),
+  resumeService: (_name: string) =>
+    Promise.reject(new ApiError(501, "Resume not supported by backend")),
+
+  // Per-service: Phase 3.5 wrappers
+  monitoringService: (name: string) =>
+    api<unknown>(`/stats/${enc(name)}`) as Promise<ServiceDetailDTO & Record<string, unknown>>,
+  serviceMetrics: async (name: string, _range: RangeKey = "1h"): Promise<MetricsDTO> => {
+    const p = await api<{ history?: Array<{ cpu?: number; memory?: number; disk?: number }> }>(
+      `/prediction/${enc(name)}`,
+    ).catch(() => ({ history: [] as Array<{ cpu?: number; memory?: number; disk?: number }> }));
+    const history = arr<{ cpu?: number; memory?: number; disk?: number }>(p.history);
+    return {
+      cpu: history.map((h, i) => ({ t: i, v: num(h.cpu) })),
+      memory: history.map((h, i) => ({ t: i, v: num(h.memory) })),
+      disk: history.map((h, i) => ({ t: i, v: num(h.disk) })),
+      network: [],
+    };
+  },
+  servicePrediction: (name: string) =>
+    api<{ risk?: string | number; confidence?: number; next_event?: string; recommendation?: string; summary?: string }>(
+      `/prediction/${enc(name)}`,
+    ),
+  serviceLogsScoped: (name: string) => api<string>(`/logs/${enc(name)}`),
+
+  // Incidents
+  incidents: async (): Promise<IncidentDTO[]> => {
+    const list = await api<unknown[]>("/incidents");
+    return arr<unknown>(list).map(normalizeIncident);
+  },
+  incidentDetail: async (id: string | number) => {
+    // Backend has no GET /incidents/{id}; resolve from list.
+    const list = await api<unknown[]>("/incidents");
+    const found = arr<Record<string, unknown>>(list).find((i) => String(i.id) === String(id));
+    return found ? (normalizeIncident(found) as IncidentDTO & Record<string, unknown>) : ({
+      id,
+      service: "unknown",
+      status: "unknown",
+      time: new Date().toISOString(),
+    } as IncidentDTO & Record<string, unknown>);
+  },
+
+  // Metrics (host-level): synthesize from /prediction for now.
+  // The backend exposes Prometheus via /monitoring/query — kept available below.
+  metrics: async (_range?: RangeKey): Promise<MetricsDTO> => {
+    // No host-wide history endpoint; return empty so hooks fall through to mock series.
+    return { cpu: [], memory: [], disk: [], network: [] };
+  },
+
+  // Notifications: synthesized from incidents until backend exposes them.
+  notifications: async (): Promise<NotificationDTO[]> => {
+    const incs = await endpoints.incidents().catch(() => [] as IncidentDTO[]);
+    return synthesizeNotificationsFromIncidents(incs);
+  },
+
+  // Alerts: normalize alertmanager response.
+  alerts: async (): Promise<AlertDTO[]> => {
+    const raw = await api<{ data?: { alerts?: unknown[] } }>("/monitoring/alerts");
+    return arr<unknown>(raw?.data?.alerts).map(normalizePromAlert);
+  },
+
+  // AI summary (synthesized — no /ai/summary endpoint upstream)
+  aiSummary: () => synthesizeAiSummary(),
+
+  // Manual incident trigger (legacy)
   restartService: (service: string) =>
-    api<{ ok: boolean }>(`/incidents/${encodeURIComponent(service)}`, { method: "POST" }),
-  runScan: () => api<{ ok: boolean }>(`/scan`, { method: "POST" }),
-  createBackup: () => api<{ ok: boolean }>(`/backup`, { method: "POST" }),
-  // Monitoring Explorer (Prometheus-style)
+    api<{ ok: boolean }>(`/incidents/${enc(service)}`, { method: "POST" }).then(() => ({ ok: true })),
+
+  // Maintenance
+  runScan: () => api<{ ok: boolean }>(`/health`, { noRetry: true }).then(() => ({ ok: true })),
+  createBackup: () =>
+    api<{ ok: boolean }>(`/backup/run`, { method: "POST" }).then(() => ({ ok: true })),
+
+  // Monitoring Explorer (Prometheus passthrough)
   promQuery: (q: string) =>
     api<{ data?: { result?: Array<{ metric?: Record<string, string>; value?: [number, string] }> } }>(
-      `/monitoring/prometheus/query?query=${encodeURIComponent(q)}`,
+      `/monitoring/query?query=${enc(q)}`,
     ),
-  promQueryRange: (q: string, range: RangeKey = "1h", step = 15) =>
+  promQueryRange: (q: string, _range: RangeKey = "1h", _step = 15) =>
     api<{ data?: { result?: Array<{ metric?: Record<string, string>; values?: Array<[number, string]> }> } }>(
-      `/monitoring/prometheus/range?query=${encodeURIComponent(q)}&range=${range}&step=${step}`,
+      `/monitoring/query?query=${enc(q)}`,
     ),
-  monitoringHistory: (metric: string, range: RangeKey = "1h") =>
-    api<MetricsDTO>(`/monitoring/history?metric=${encodeURIComponent(metric)}&range=${range}`),
+  monitoringHistory: async (_metric: string, _range: RangeKey = "1h"): Promise<MetricsDTO> => ({
+    cpu: [],
+    memory: [],
+    disk: [],
+    network: [],
+  }),
 };
-
-
