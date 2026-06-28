@@ -16,6 +16,7 @@ import { topMetrics as mockTopMetrics, liveEvents as fallbackEvents, infraNodes,
 import {
   useMonitoring, useServices, useIncidents, useNotifications, useMetrics, useAiSummary,
   useAlerts, useRestartService, useRunScan, useCreateBackup, useBackupSummary,
+  useAutomationSummary,
 } from "@/hooks/useGuardianData";
 import { API_CONFIGURED } from "@/lib/api";
 
