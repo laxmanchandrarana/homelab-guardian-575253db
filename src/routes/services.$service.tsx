@@ -233,6 +233,15 @@ function InfoRow({ label, value, mono, copy }: { label: string; value: React.Rea
   );
 }
 
+function KpiCard({ label, value, sub, mono, tone }: { label: string; value: React.ReactNode; sub?: string; mono?: boolean; tone?: string }) {
+  return (
+    <Card className="p-3">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={cn("mt-1 text-sm font-semibold truncate", mono && "font-mono", tone)}>{value || "—"}</div>
+      {sub && <div className="text-[10px] text-muted-foreground truncate">{sub}</div>}
+    </Card>
+  );
+
 // ────────────────────────────── page ──────────────────────────────
 
 function ServiceDetailPage() {
