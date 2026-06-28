@@ -57,11 +57,15 @@ import {
   useStartService,
   useStopService,
   useRestartServiceDirect,
+  usePauseService,
+  useResumeService,
+  useServicePrediction,
   useMetrics,
   useIncidents,
 } from "@/hooks/useGuardianData";
 import { useGuardianSocket } from "@/hooks/useGuardianSocket";
 import type { RangeKey } from "@/lib/api";
+import { Sparkles, PauseCircle } from "lucide-react";
 
 export const Route = createFileRoute("/services/$service")({
   head: () => ({ meta: [{ title: "Service — Homelab Guardian" }] }),
@@ -229,6 +233,17 @@ function InfoRow({ label, value, mono, copy }: { label: string; value: React.Rea
   );
 }
 
+function KpiCard({ label, value, sub, mono, tone }: { label: string; value: React.ReactNode; sub?: string; mono?: boolean; tone?: string }) {
+  return (
+    <Card className="p-3">
+      <div className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className={cn("mt-1 text-sm font-semibold truncate", mono && "font-mono", tone)}>{value || "—"}</div>
+      {sub && <div className="text-[10px] text-muted-foreground truncate">{sub}</div>}
+    </Card>
+  );
+}
+
+
 // ────────────────────────────── page ──────────────────────────────
 
 function ServiceDetailPage() {
@@ -243,6 +258,9 @@ function ServiceDetailPage() {
   const start = useStartService();
   const stop = useStopService();
   const restart = useRestartServiceDirect();
+  const pause = usePauseService();
+  const resume = useResumeService();
+  const predictionQ = useServicePrediction(service);
 
   // fallback to list-derived row if detail endpoint doesn't exist
   const fallback = services.find((s) => s.name === service);
@@ -331,6 +349,11 @@ function ServiceDetailPage() {
                         <Heart className="size-3" /> {String(d.health)}
                       </Badge>
                     )}
+                    {(d.autoHeal ?? d.autoheal) && (
+                      <Badge variant="outline" className="gap-1 text-xs border-emerald-500/40 text-emerald-300">
+                        <Shield className="size-3" /> Auto-Heal
+                      </Badge>
+                    )}
                   </div>
                 )}
                 <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
@@ -355,12 +378,37 @@ function ServiceDetailPage() {
               <Button size="sm" variant="outline" onClick={() => doAction(stop, "Stopped")} disabled={stop.isPending}>
                 <Square className="size-3.5" /> Stop
               </Button>
+              <Button size="sm" variant="outline" onClick={() => doAction(pause, "Paused")} disabled={pause.isPending}>
+                <PauseCircle className="size-3.5" /> Pause
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => doAction(resume, "Resumed")} disabled={resume.isPending}>
+                <PlayCircle className="size-3.5" /> Resume
+              </Button>
               <Button size="sm" onClick={() => doAction(restart, "Restarted")} disabled={restart.isPending}>
                 <RotateCw className={cn("size-3.5", restart.isPending && "animate-spin")} /> Restart
               </Button>
               <Button size="sm" variant="secondary" onClick={() => setLogsOpen(true)}>
                 <Terminal className="size-3.5" /> Logs
               </Button>
+              {(d.container_id || d.id) && (
+                <Button size="sm" variant="ghost" onClick={() => copyText(String(d.container_id ?? d.id), "Container ID")}>
+                  <Copy className="size-3.5" /> ID
+                </Button>
+              )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => copyText(`docker restart ${d.container_name ?? service}`, "Docker command")}
+              >
+                <Copy className="size-3.5" /> docker
+              </Button>
+              {d.url && (
+                <a href={d.url} target="_blank" rel="noreferrer">
+                  <Button size="sm" variant="ghost">
+                    <ExternalLink className="size-3.5" /> Open
+                  </Button>
+                </a>
+              )}
               {d.portainer_url && (
                 <a href={d.portainer_url} target="_blank" rel="noreferrer">
                   <Button size="sm" variant="ghost">
@@ -371,6 +419,22 @@ function ServiceDetailPage() {
             </div>
           </div>
         </Card>
+
+        {/* Health Summary KPI strip */}
+        <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
+          <KpiCard label="Status" value={tone.label} tone={tone.text} />
+          <KpiCard label="CPU" value={`${Math.round(cpu)}%`} />
+          <KpiCard label="Memory" value={`${Math.round(mem)}%`} sub={d.memory_limit ? `of ${d.memory_limit}` : undefined} />
+          <KpiCard label="Disk" value={`${Math.round(disk)}%`} />
+          <KpiCard label="Net RX" value={`${netRx.toFixed(1)} MB/s`} />
+          <KpiCard label="Net TX" value={`${netTx.toFixed(1)} MB/s`} />
+          <KpiCard label="Uptime" value={d.uptime ?? "—"} />
+          <KpiCard label="Restarts" value={String(d.restart_count ?? d.restarts ?? 0)} />
+          <KpiCard label="Image" value={d.image?.split(":")[0] ?? "—"} mono />
+          <KpiCard label="Tag" value={d.image_tag ?? d.image?.split(":")[1] ?? "latest"} mono />
+          <KpiCard label="Container" value={String(d.container_id ?? d.id ?? "—").slice(0, 12)} mono />
+          <KpiCard label="Updated" value={d.last_update ?? d.last_check ?? "—"} />
+        </div>
 
         {/* Gauges */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -463,6 +527,7 @@ function ServiceDetailPage() {
           {/* Right: side panels */}
           <div className="space-y-5">
             <PerformanceScore score={score} label={scoreLabel} />
+            <PredictionCard data={predictionQ.data} isLoading={predictionQ.isLoading} />
 
             <Card>
               <SectionHeader icon={Heart} title="Health Checks" />
@@ -543,7 +608,7 @@ function HistoryCharts() {
           )}
         </div>
         <div className="flex gap-1">
-          {(["1h", "6h", "24h"] as RangeKey[]).map((r) => (
+          {(["15m", "1h", "6h", "24h", "7d"] as RangeKey[]).map((r) => (
             <Button
               key={r}
               size="sm"
@@ -723,6 +788,42 @@ function PerformanceScore({ score, label }: { score: number; label: string }) {
     </Card>
   );
 }
+
+function PredictionCard({ data, isLoading }: { data: any; isLoading: boolean }) {
+  const risk = String(data?.risk ?? "").toLowerCase();
+  const riskTone =
+    risk === "high" || risk === "critical" ? "text-rose-300 border-rose-500/40" :
+    risk === "medium" || risk === "warning" ? "text-amber-300 border-amber-500/40" :
+    risk ? "text-emerald-300 border-emerald-500/40" : "text-muted-foreground";
+  return (
+    <Card>
+      <SectionHeader icon={Sparkles} title="Guardian AI Prediction" />
+      {isLoading ? (
+        <Skeleton className="h-16 w-full" />
+      ) : !data ? (
+        <div className="text-xs text-muted-foreground italic">No prediction available yet.</div>
+      ) : (
+        <div className="space-y-2">
+          {data.risk && (
+            <Badge variant="outline" className={cn("gap-1 text-[10px]", riskTone)}>
+              Risk: {data.risk}
+              {typeof data.confidence === "number" && <span className="opacity-70">· {Math.round(data.confidence * 100)}%</span>}
+            </Badge>
+          )}
+          {data.summary && <p className="text-xs leading-relaxed">{data.summary}</p>}
+          {data.next_event && <InfoRow label="Next Event" value={data.next_event} />}
+          {data.recommendation && (
+            <div className="text-xs p-2 rounded-lg bg-primary/5 border border-primary/20">
+              <span className="text-primary font-medium">Recommended: </span>{data.recommendation}
+            </div>
+          )}
+        </div>
+      )}
+    </Card>
+  );
+}
+
+
 
 // ────────────────────────────── Logs Drawer ──────────────────────────────
 

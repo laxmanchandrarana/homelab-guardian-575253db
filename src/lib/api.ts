@@ -36,7 +36,7 @@ export async function api<T = unknown>(path: string, options: RequestInit = {}):
   return (text ? JSON.parse(text) : (undefined as unknown)) as T;
 }
 
-export type RangeKey = "15m" | "1h" | "6h" | "24h";
+export type RangeKey = "15m" | "1h" | "6h" | "24h" | "7d";
 
 
 // Derive WS URL from API_URL (http -> ws, https -> wss).
@@ -161,6 +161,13 @@ export const endpoints = {
   startService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/start`, { method: "POST" }),
   stopService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/stop`, { method: "POST" }),
   restartServiceDirect: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/restart`, { method: "POST" }),
+  pauseService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/pause`, { method: "POST" }),
+  resumeService: (name: string) => api<{ ok: boolean }>(`/services/${encodeURIComponent(name)}/resume`, { method: "POST" }),
+  // Phase 3.5 — service-scoped wrappers (gracefully optional on the backend)
+  monitoringService: (name: string) => api<ServiceDetailDTO & Record<string, unknown>>(`/monitoring/service/${encodeURIComponent(name)}`),
+  serviceMetrics: (name: string, range: RangeKey = "1h") => api<MetricsDTO>(`/metrics/${encodeURIComponent(name)}?range=${range}`),
+  servicePrediction: (name: string) => api<{ risk?: string; confidence?: number; next_event?: string; recommendation?: string; summary?: string }>(`/prediction/${encodeURIComponent(name)}`),
+  serviceLogsScoped: (name: string) => api<string | { logs?: string; lines?: string[] }>(`/logs/${encodeURIComponent(name)}`),
   incidents: () => api<IncidentDTO[]>("/incidents"),
   incidentDetail: (id: string | number) => api<IncidentDTO & Record<string, unknown>>(`/incidents/${encodeURIComponent(String(id))}`),
   metrics: (range?: RangeKey) => api<MetricsDTO>(`/metrics${range ? `?range=${range}` : ""}`),
