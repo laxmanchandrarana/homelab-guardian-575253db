@@ -846,4 +846,96 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
+function fmtBytes(n: number) {
+  if (!n || n < 0) return "—";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let i = 0;
+  let v = n;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return `${v.toFixed(v >= 10 ? 0 : 1)} ${units[i]}`;
+}
+
+function BackupSummary() {
+  const navigate = useNavigate();
+  const { count, latest, totalBytes, successRate, isLoading, error, refetch } = useBackupSummary();
+  const backup = useCreateBackup();
+
+  const latestStatus = (latest as any)?.status ? String((latest as any).status).toUpperCase() : null;
+  const latestService = (latest as any)?.service ?? (latest as any)?.name ?? null;
+  const latestWhen =
+    (latest as any)?.completed_at ?? (latest as any)?.created_at ?? (latest as any)?.timestamp ?? null;
+
+  const statusClass =
+    latestStatus === "SUCCESS"
+      ? "bg-success/15 text-success ring-success/30"
+      : latestStatus === "FAILED"
+      ? "bg-destructive/15 text-destructive ring-destructive/30"
+      : latestStatus === "RUNNING"
+      ? "bg-warning/15 text-warning ring-warning/30"
+      : "bg-muted/40 text-muted-foreground ring-border";
+
+  return (
+    <section className="surface-card p-5">
+      <div className="mb-4 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <HardDriveDownload className="h-4 w-4 text-primary" />
+          <h3 className="text-sm font-semibold">Backups</h3>
+          {latestStatus && (
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider ring-1 ${statusClass}`}>
+              {latestStatus}
+            </span>
+          )}
+        </div>
+        <button onClick={() => navigate({ to: "/backups" })} className="text-xs text-primary hover:underline">
+          Open backup center
+        </button>
+      </div>
+      {isLoading && count === 0 ? (
+        <SkeletonRows n={2} />
+      ) : error ? (
+        <ErrorCard message="Couldn't load backups" onRetry={() => refetch()} />
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            <Stat label="Total backups" value={String(count)} />
+            <Stat label="Storage used" value={fmtBytes(totalBytes)} />
+            <Stat label="Success rate" value={successRate == null ? "—" : `${successRate}%`} />
+            <Stat label="Last backup" value={fmtRelative(latestWhen ?? undefined)} />
+          </div>
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-background/40 px-3 py-2 text-xs">
+            <div className="min-w-0 truncate text-muted-foreground">
+              {latestService ? <>Latest: <span className="text-foreground">{latestService}</span></> : "No recent backup yet"}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => API_CONFIGURED && backup.mutate()}
+                disabled={backup.isPending || !API_CONFIGURED}
+                className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 hover:bg-accent disabled:opacity-50"
+              >
+                <Database className={`h-3 w-3 ${backup.isPending ? "animate-spin" : ""}`} /> Run backup
+              </button>
+              <button
+                onClick={() => navigate({ to: "/backups" })}
+                className="inline-flex items-center gap-1 rounded border border-border bg-card px-2 py-1 hover:bg-accent"
+              >
+                View all <ArrowRight className="h-3 w-3" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+    </section>
+  );
+}
+
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-border bg-background/40 px-3 py-2">
+      <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">{label}</div>
+      <div className="mt-0.5 text-lg font-semibold tabular-nums">{value}</div>
+    </div>
+  );
+}
+
+
 
