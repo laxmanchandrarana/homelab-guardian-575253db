@@ -467,13 +467,14 @@ function ServicesPreview() {
                   <span className="capitalize text-muted-foreground">{s.status === "healthy" ? "Running" : s.status}</span>
                 </div>
               </div>
-              <label className="inline-flex cursor-pointer items-center gap-1.5 text-[10px] text-muted-foreground">
+              <label onClick={(e) => e.stopPropagation()} className="inline-flex cursor-pointer items-center gap-1.5 text-[10px] text-muted-foreground">
                 <input type="checkbox" defaultChecked={s.autoHeal} className="peer sr-only" />
                 <span className="relative h-4 w-7 rounded-full bg-muted transition-colors peer-checked:bg-primary">
                   <span className="absolute left-0.5 top-0.5 h-3 w-3 rounded-full bg-foreground transition-transform peer-checked:translate-x-3" />
                 </span>
                 Auto
               </label>
+
             </div>
             <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-muted-foreground">
               <div><div className="text-base font-medium text-foreground tabular-nums">{s.cpu}%</div>CPU</div>
