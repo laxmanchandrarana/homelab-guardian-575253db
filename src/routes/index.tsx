@@ -73,7 +73,8 @@ function Dashboard() {
           <div className="flex flex-col gap-6">
             <ChartsCard range={range} setRange={setRange} />
             <ActiveAlerts />
-            <InfraStatus />
+            <BackupSummary />
+
             <IncidentTimeline />
             <ServicesPreview />
           </div>
