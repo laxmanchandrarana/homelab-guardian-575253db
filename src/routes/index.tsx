@@ -4,7 +4,7 @@ import {
   Cpu, Brain, RotateCw, FileText, BarChart3, ChevronRight,
   ShieldCheck, Activity, Lightbulb, Clock, CheckCircle2, AlertTriangle, ArrowRight,
   Bell, ExternalLink, ScanLine, Database, Send, MessageCircle, Hash, Mail,
-  AlertCircle, RefreshCw, Inbox, HardDriveDownload,
+  AlertCircle, RefreshCw, Inbox, HardDriveDownload, Zap,
 } from "lucide-react";
 
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
