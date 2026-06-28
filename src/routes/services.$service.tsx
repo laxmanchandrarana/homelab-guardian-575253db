@@ -415,7 +415,14 @@ function ServiceDetailPage() {
                   {(d.lastRestart || d.last_restart) && (
                     <span>Last restart {String(d.lastRestart ?? d.last_restart)}</span>
                   )}
+                  {liveStatsConnected && (
+                    <Badge variant="outline" className="gap-1 text-[10px] border-emerald-500/40 text-emerald-300">
+                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      LIVE STATS
+                    </Badge>
+                  )}
                 </div>
+
               </div>
             </div>
 
