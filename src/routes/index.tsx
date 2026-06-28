@@ -4,8 +4,9 @@ import {
   Cpu, Brain, RotateCw, FileText, BarChart3, ChevronRight,
   ShieldCheck, Activity, Lightbulb, Clock, CheckCircle2, AlertTriangle, ArrowRight,
   Bell, ExternalLink, ScanLine, Database, Send, MessageCircle, Hash, Mail,
-  AlertCircle, RefreshCw, Inbox,
+  AlertCircle, RefreshCw, Inbox, HardDriveDownload,
 } from "lucide-react";
+
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 import { AppShell } from "@/components/AppShell";
 import { AnimatedNumber } from "@/components/AnimatedNumber";
