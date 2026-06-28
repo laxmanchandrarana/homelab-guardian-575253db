@@ -717,7 +717,9 @@ function QuickActions() {
     { label: "Restart service", icon: RotateCw, onClick: () => navigate({ to: "/services" }) },
     { label: "Run scan", icon: ScanLine, onClick: () => API_CONFIGURED && scan.mutate(), loading: scan.isPending },
     { label: "Create backup", icon: Database, onClick: () => API_CONFIGURED && backup.mutate(), loading: backup.isPending },
+    { label: "Backup center", icon: HardDriveDownload, onClick: () => navigate({ to: "/backups" }) },
     { label: "Prometheus", icon: ExternalLink, href: "http://prometheus.local" },
+
     { label: "Grafana", icon: ExternalLink, href: "http://grafana.local" },
     { label: "Portainer", icon: ExternalLink, href: "http://portainer.local" },
   ];
