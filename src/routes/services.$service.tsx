@@ -267,6 +267,7 @@ function ServiceDetailPage() {
   const router = useRouter();
   const navigate = useNavigate();
   useGuardianSocket();
+  const { connected: liveStatsConnected } = useServiceLiveStats(service);
 
   const detailQ = useServiceDetail(service);
   const { services } = useServices();
@@ -276,7 +277,9 @@ function ServiceDetailPage() {
   const restart = useRestartServiceDirect();
   const pause = usePauseService();
   const resume = useResumeService();
+  const del = useDeleteService();
   const predictionQ = useServicePrediction(service);
+
 
   // fallback to list-derived row if detail endpoint doesn't exist
   const fallback = services.find((s) => s.name === service);
